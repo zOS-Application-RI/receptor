@@ -124,10 +124,10 @@ $(RECEPTOR_PYTHON_WORKER_WHEEL): receptor-python-worker/README.md receptor-pytho
 	@cd receptor-python-worker && python3 -m build --wheel
 
 # Container command can be docker or podman
-CONTAINERCMD := podman
+CONTAINERCMD := docker
 
 # Repo without tag
-REPO := quay.io/ansible/receptor
+REPO := docker.io/ashish1981/receptor
 # TAG is VERSION with a '-' instead of a '+', to avoid invalid image reference error.
 TAG := $(subst +,-,$(VERSION))
 # Set this to tag image as :latest in addition to :$(VERSION)
@@ -138,7 +138,14 @@ container: .container-flag-$(VERSION)
 	@tar --exclude-vcs-ignores -czf packaging/container/source.tar.gz .
 	@cp $(RECEPTORCTL_WHEEL) packaging/container
 	@cp $(RECEPTOR_PYTHON_WORKER_WHEEL) packaging/container
-	$(CONTAINERCMD) build packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,)
+	$(CONTAINERCMD) buildx build packaging/container \
+	--platform=linux/arm64,linux/s390x --push \
+	--build-arg VERSION=$(VERSION:v%=%) \
+	-t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,) --progress=plain
+	$(CONTAINERCMD) build packaging/container \
+	--build-arg VERSION=$(VERSION:v%=%) \
+	--cache-from=$(REPO):$(TAG) \
+	-t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,) --progress=plain
 	@touch .container-flag-$(VERSION)
 
 tc-image: container
