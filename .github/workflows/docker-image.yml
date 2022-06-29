@@ -5,20 +5,20 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to release. (x.y.z) Will create a tag / draft release.'
-        required: true
-        default: ''
-      ref:
-        description: 'The ref to tag. Can be a branch name / SHA / etc.'
-        required: true
-        default: ''
-      confirm:
-        description: 'Are you sure? Set this to yes.'
-        required: true
-        default: 'yes'
+  # workflow_dispatch:
+  #   inputs:
+  #     version:
+  #       description: 'Version to release. (x.y.z) Will create a tag / draft release.'
+  #       required: true
+  #       default: ''
+  #     ref:
+  #       description: 'The ref to tag. Can be a branch name / SHA / etc.'
+  #       required: true
+  #       default: ''
+  #     confirm:
+  #       description: 'Are you sure? Set this to yes.'
+  #       required: true
+  #       default: 'yes'
 
 jobs:
   docker:
@@ -50,7 +50,6 @@ jobs:
           # ts=$(date +%s)
           ts=$(date +%Y-%m-%d--%H-%M)
           echo "::set-output name=BUILD_ID::${branch}-${ts}"          
-
       - 
         name: Install python
         uses: actions/setup-python@v4
