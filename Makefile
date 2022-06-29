@@ -131,7 +131,7 @@ REPO := docker.io/ashish1981/receptor
 # TAG is VERSION with a '-' instead of a '+', to avoid invalid image reference error.
 TAG := $(subst +,-,$(VERSION))
 # Set this to tag image as :latest in addition to :$(VERSION)
-LATEST :=
+LATEST :
 
 container: .container-flag-$(VERSION)
 .container-flag-$(VERSION): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
@@ -139,12 +139,8 @@ container: .container-flag-$(VERSION)
 	@cp $(RECEPTORCTL_WHEEL) packaging/container
 	@cp $(RECEPTOR_PYTHON_WORKER_WHEEL) packaging/container
 	$(CONTAINERCMD) buildx build packaging/container \
-	--platform=linux/arm64,linux/s390x --push \
+	--platform=linux/arm64,linux/s390x,linux/amd64 --push \
 	--build-arg VERSION=$(VERSION:v%=%) \
-	-t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,) --progress=plain
-	$(CONTAINERCMD) build packaging/container \
-	--build-arg VERSION=$(VERSION:v%=%) \
-	--cache-from=$(REPO):$(TAG) \
 	-t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,) --progress=plain
 	@touch .container-flag-$(VERSION)
 
