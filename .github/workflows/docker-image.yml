@@ -96,10 +96,14 @@ jobs:
       #     labels: ${{ steps.meta.outputs.labels }}
       #     cache-from: type=local,src=/tmp/.buildx-cache
       #     cache-to: type=local,dest=/tmp/.buildx-cache
+      - name: Extract branch name
+        shell: bash
+        run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+        id: extract_branch
 
       - name: Build container image
         run: |
-          make container OFFICIAL_VERSION=yes CONTAINERCMD=docker REPO=docker.io/${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }} VERSION=v${{ github.event.inputs.version }} LATEST=yes
+          make container OFFICIAL_VERSION=yes CONTAINERCMD=docker REPO=docker.io/${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }} VERSION=${{ steps.extract_branch.outputs.branch }} LATEST=yes
       -   
         name : Docker Scan Image
         id: scan
