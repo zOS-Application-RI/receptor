@@ -135,7 +135,14 @@ jobs:
         uses: github/codeql-action/upload-sarif@v2
         with:
           sarif_file: snyk.sarif
-
+          
+      - name: Create draft release
+        run: |
+          ansible-playbook tools/ansible/stage.yml \
+            -e version=${{ github.event.inputs.version }} \
+            -e repo=${{ github.repository_owner }}/receptor \
+            -e github_token=${{ secrets.GITHUB_TOKEN }} \
+            -e target_commitish=${{ github.event.inputs.ref }}
 
       -
         name: Image digest
