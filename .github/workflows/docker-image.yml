@@ -5,27 +5,28 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release. (x.y.z) Will create a tag / draft release.'
+        required: true
+        default: ''
+      ref:
+        description: 'The ref to tag. Can be a branch name / SHA / etc.'
+        required: true
+        default: ''
+      confirm:
+        description: 'Are you sure? Set this to yes.'
+        required: true
+        default: 'yes'
 
 jobs:
   docker:
     runs-on: ubuntu-latest
-    permissions:
-      packages: write
-      contents: write
+    # permissions:
+    #   packages: write
+    #   contents: write
     steps:
-      -
-        name: Checkout
-        uses: actions/checkout@v3
-
-      - 
-        name: Install python
-        uses: actions/setup-python@v2
-
-      - 
-        name: Install dependencies
-        run: |
-          python3 -m pip install build
-
       -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v2.0.0
@@ -49,6 +50,15 @@ jobs:
           # ts=$(date +%s)
           ts=$(date +%Y-%m-%d--%H-%M)
           echo "::set-output name=BUILD_ID::${branch}-${ts}"          
+
+      - 
+        name: Install python
+        uses: actions/setup-python@v2
+
+      - 
+        name: Install dependencies
+        run: |
+          python3 -m pip install build
 
       -     
         name: Cache Docker layers
@@ -82,6 +92,10 @@ jobs:
       #     labels: ${{ steps.meta.outputs.labels }}
       #     cache-from: type=local,src=/tmp/.buildx-cache
       #     cache-to: type=local,dest=/tmp/.buildx-cache
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+
       - name: Build container image
         run: |
           make container CONTAINERCMD=docker REPO=docker.io/${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }} VERSION=v${{ github.event.inputs.version }} LATEST=yes
