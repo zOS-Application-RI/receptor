@@ -1,6 +1,6 @@
 # If the current commit has been tagged, use that as the version.
 # Otherwise include short commit hash.
-OFFICIAL_VERSION := $(shell if VER=`git describe --exact-match --tags 2>/dev/null`; then echo $$VER; else echo ""; fi)
+OFFICIAL_VERSION := $(shell if VER=`git describe --exact-match --tags 2>/dev/null`; then echo $$VER; else echo "yes"; fi)
 ifeq ($(OFFICIAL_VERSION),)
 VERSION := $(shell git describe --tags | cut -d - -f -1)+g$(shell git rev-parse --short HEAD)
 else

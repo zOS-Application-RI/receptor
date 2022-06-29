@@ -53,12 +53,17 @@ jobs:
 
       - 
         name: Install python
-        uses: actions/setup-python@v2
-
+        uses: actions/setup-python@v4
+        with:
+          python-version: 'pypy3.9'
       - 
         name: Install dependencies
         run: |
           python3 -m pip install build
+
+      -
+        name: Checkout
+        uses: actions/checkout@v3
 
       -     
         name: Cache Docker layers
@@ -92,13 +97,10 @@ jobs:
       #     labels: ${{ steps.meta.outputs.labels }}
       #     cache-from: type=local,src=/tmp/.buildx-cache
       #     cache-to: type=local,dest=/tmp/.buildx-cache
-      -
-        name: Checkout
-        uses: actions/checkout@v3
 
       - name: Build container image
         run: |
-          make container CONTAINERCMD=docker REPO=docker.io/${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }} VERSION=v${{ github.event.inputs.version }} LATEST=yes
+          make container OFFICIAL_VERSION=yes CONTAINERCMD=docker REPO=docker.io/${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }} VERSION=v${{ github.event.inputs.version }} LATEST=yes
       -   
         name : Docker Scan Image
         id: scan
