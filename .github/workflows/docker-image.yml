@@ -60,6 +60,10 @@ jobs:
         run: |
           python3 -m pip install build
 
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+
       -     
         name: Cache Docker layers
         uses: actions/cache@v3.0.4
@@ -92,9 +96,6 @@ jobs:
       #     labels: ${{ steps.meta.outputs.labels }}
       #     cache-from: type=local,src=/tmp/.buildx-cache
       #     cache-to: type=local,dest=/tmp/.buildx-cache
-      -
-        name: Checkout
-        uses: actions/checkout@v3
 
       - name: Build container image
         run: |
