@@ -134,7 +134,13 @@ jobs:
         uses: github/codeql-action/upload-sarif@v2
         with:
           sarif_file: snyk.sarif
-          
+
+      - uses: ncipollo/release-action@v1
+        with:
+          # artifacts: "release.tar.gz,foo/*.txt"
+          # bodyFile: "body.md"
+          token: ${{ secrets.GITHUB_TOKEN }}          
+
       - name: Create draft release
         run: |
           ansible-playbook tools/ansible/stage.yml \
