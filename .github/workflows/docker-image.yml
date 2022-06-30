@@ -118,12 +118,12 @@ jobs:
       #   with:
       #     sarif_file: ${{ steps.scan.outputs.sarif }}
 
-      - name: Container image scan
-        uses: Azure/container-scan@v0.1
-        with:
-          image-name: ${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }}
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+      # - name: Container image scan
+      #   uses: Azure/container-scan@v0.1
+      #   with:
+      #     image-name: ${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }}
+      #     username: ${{ secrets.DOCKER_HUB_USERNAME }}
+      #     password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
       - name: Run Snyk to check Docker image for vulnerabilities
         continue-on-error: true
