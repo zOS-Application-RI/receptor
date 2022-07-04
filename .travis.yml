@@ -16,6 +16,7 @@ jobs:
         - docker buildx version
         - docker buildx create --use --bootstrap
         - docker buildx ls
+        - sudo apt install python3.9 python3.9-dev python3.9-venv pip
       before_script: 
         - python3 -m pip install --no-cache-dir -U pip build
         # - sudo apt install -y pip3
@@ -41,6 +42,7 @@ jobs:
         - docker buildx version
         - docker buildx create --use --bootstrap
         - docker buildx ls
+        - sudo apt install python3.9 python3.9-dev python3.9-venv pip
       before_script: 
         - python3 -m pip install --no-cache-dir -U pip build
         - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
@@ -64,6 +66,7 @@ jobs:
         - docker buildx version
         - docker buildx create --use --bootstrap
         - docker buildx ls
+        - sudo apt install python3.9 python3.9-dev python3.9-venv pip
       before_script: 
         - python3 -m pip install --no-cache-dir -U pip build
         - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
