@@ -31,7 +31,7 @@ endif
 # no_workceptor:  Disable the unit-of-work subsystem (be network only)
 #
 # no_cert_auth:   Disable commands related to CA and certificate generation
-
+PLATFORM ?=
 TAGS ?=
 ifeq ($(TAGS),)
 	TAGPARAM=
@@ -138,17 +138,18 @@ container: .container-flag-$(VERSION)
 	@tar --exclude-vcs-ignores -czf packaging/container/source.tar.gz .
 	@cp $(RECEPTORCTL_WHEEL) packaging/container
 	@cp $(RECEPTOR_PYTHON_WORKER_WHEEL) packaging/container
-	$(CONTAINERCMD) build packaging/container \
-	# --platform=linux/arm64,linux/s390x,linux/amd64 --push \
-	--build-arg VERSION=$(VERSION:v%=%) \
-	-t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,) \
-	# --progress=plain \
-	--cache-from=$(REPO):$(TAG)
-	# $(CONTAINERCMD) buildx build packaging/container \
+	# $(CONTAINERCMD) build packaging/container \
 	# --platform=linux/arm64,linux/s390x,linux/amd64 --push \
 	# --build-arg VERSION=$(VERSION:v%=%) \
-	# -t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,) --progress=plain \
+	# -t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,) \
+	# --progress=plain \
 	# --cache-from=$(REPO):$(TAG)
+	$(CONTAINERCMD) buildx build packaging/container \
+	--platform=$(PLATFORM) --push \
+	--build-arg VERSION=$(VERSION:v%=%) \
+	-t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,) \
+	# --progress=plain \	
+	--cache-from=$(REPO):$(TAG)
 	@touch .container-flag-$(VERSION)
 
 tc-image: container
