@@ -1,5 +1,5 @@
 language: bash
-dist: focal
+dist: bionic
 before_install:
   - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
 script:
