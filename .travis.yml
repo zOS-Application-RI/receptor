@@ -1,15 +1,12 @@
 # language: python
-# os: linux
-# python: 3.9
-# os: linux-s390
-# python: 3.9
-arch:
-  - amd64
-  # - ppc64le
-  # - linux-s390x
-  - arm64
+os: linux-amd
+python: 3.9
+os: linux-s390
+python: 3.9
+os: linux-arm
+python: 3.9
 
-# os: 
+ 
 
 dist: focal
 # addons:
