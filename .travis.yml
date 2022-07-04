@@ -9,7 +9,7 @@ jobs:
       python: 3.9
       # services: docker
       before_install:
-        - sudo rm -rf /var/lib/apt/lists/* && sudo apt update && sudo apt install -y pip
+        - sudo rm -rf /var/lib/apt/lists/* && sudo apt update && sudo apt install -y pip3
         - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
       # script:
         - docker version
@@ -33,7 +33,7 @@ jobs:
       python: 3.9
       # services: docker
       before_install:
-        - sudo rm -rf /var/lib/apt/lists/* && sudo apt update && sudo apt install -y pip
+        - sudo rm -rf /var/lib/apt/lists/* && sudo apt update && sudo apt install -y pip3
         - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
       # script:
         - docker version
@@ -56,7 +56,7 @@ jobs:
       python: 3.9
       # services: docker
       before_install:
-        - sudo rm -rf /var/lib/apt/lists/* && sudo apt update && sudo apt install -y pip
+        - sudo rm -rf /var/lib/apt/lists/* && sudo apt update && sudo apt install -y pip3
         - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
       # script:
         - docker version
