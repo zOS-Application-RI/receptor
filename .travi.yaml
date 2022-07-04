@@ -1,0 +1,7 @@
+language: bash
+dist: focal
+before_install:
+  - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
+script:
+  - docker version
+  - docker buildx version
