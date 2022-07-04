@@ -144,11 +144,9 @@ container: .container-flag-$(VERSION)
 	# -t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,) \
 	# --progress=plain \
 	# --cache-from=$(REPO):$(TAG)
-	$(CONTAINERCMD) buildx build packaging/container \
-	--platform=$(PLATFORM) --push \
-	--build-arg VERSION=$(VERSION:v%=%) \
-	-t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,) \ 
-		--progress=plain --cache-from=$(REPO):$(TAG)
+	$(CONTAINERCMD) buildx build --platform=$(PLATFORM) --push \
+	packaging/container --build-arg VERSION=$(VERSION:v%=%) \
+	-t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,) --cache-from=$(REPO):$(TAG)
 	@touch .container-flag-$(VERSION)
 
 tc-image: container
