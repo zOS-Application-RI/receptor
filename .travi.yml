@@ -1,9 +1,28 @@
 language: bash
 dist: bionic
+addons:
+  apt:
+    packages:
+      - python3.9
+      - pip3
+
 before_install:
   - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
-script:
+# script:
   - docker version
   - docker buildx version
   - docker buildx create --use --bootstrap
   - docker buildx ls
+  - python3 -m pip install build
+
+jobs:
+  include:
+    - stage: Build MultiArch AWX-Receptor
+      before_script: 
+        - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+        - export DEPLOY_TIMESTAMP=`date +'%Y%m%d-%H%M%S'`
+        - export git_repo=$(echo $TRAVIS_REPO_SLUG |  awk -F"/" '{print tolower($2)}')
+      script: 
+        -  make container OFFICIAL_VERSION=yes CONTAINERCMD=docker REPO=docker.io/${{  }}/${{ git_repo }} VERSION=v1.2.4 LATEST=yes
+      after_script:
+        - echo "Script completed on" DEPLOY_TIMESTAMP
