@@ -15,8 +15,7 @@ jobs:
         - docker buildx version
         - docker buildx create --use --bootstrap
         - docker buildx ls
-        - python3 -m ensurepip --default-pip --user
-        - python3 -m pip install build
+        - python3 -m pip install --no-cache-dir -U pip build
       before_script: 
         - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
         - export DEPLOY_TIMESTAMP=`date +'%Y%m%d-%H%M%S'`
@@ -39,8 +38,7 @@ jobs:
         - docker buildx version
         - docker buildx create --use --bootstrap
         - docker buildx ls
-        - python3 -m ensurepip --default-pip --user
-        - python3 -m pip install build
+        - python3 -m pip install --no-cache-dir -U pip build
       before_script: 
         - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
         - export DEPLOY_TIMESTAMP=`date +'%Y%m%d-%H%M%S'`
@@ -62,8 +60,7 @@ jobs:
         - docker buildx version
         - docker buildx create --use --bootstrap
         - docker buildx ls
-        - python3 -m ensurepip --default-pip --user
-        - python3 -m pip install build
+        - python3 -m pip install --no-cache-dir -U pip build
       before_script: 
         - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
         - export DEPLOY_TIMESTAMP=`date +'%Y%m%d-%H%M%S'`
@@ -76,10 +73,11 @@ jobs:
         - echo "Script completed on" DEPLOY_TIMESTAMP
     
     - stage: Merge Manifests
+      services: docker
       before_install:
-        - sudo rm -rf /var/lib/apt/lists/* && sudo apt update 
-        - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
-      # script:
+      #   - sudo rm -rf /var/lib/apt/lists/* && sudo apt update 
+      #   - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
+      # # script:
         - docker version
       script: 
         - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
