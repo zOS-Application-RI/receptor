@@ -14,7 +14,7 @@ before_install:
   - docker buildx create --use --bootstrap
   - docker buildx ls
   - sudo apt update -y && sudo apt install software-properties-common -y
-  - sudo add-apt-repository ppa:deadsnakes/ppa -y && sudo apt install python3.9 pip3 
+  - sudo add-apt-repository ppa:deadsnakes/ppa -y && sudo apt install python3.9 pip3 -y
   - python3 -m pip install build
 
 jobs:
