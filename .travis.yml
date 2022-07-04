@@ -1,9 +1,9 @@
 # language: python
-os: linux-amd
+os: linux/amd64
 python: 3.9
 os: linux-s390
 python: 3.9
-os: linux-arm
+os: linux/arm64
 python: 3.9
 
  
