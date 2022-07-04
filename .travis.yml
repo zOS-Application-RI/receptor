@@ -7,10 +7,10 @@ jobs:
 
     - stage: Build s390x AWX-Receptor
       python: 3.9
-      services: docker
+      # services: docker
       before_install:
-        # - sudo rm -rf /var/lib/apt/lists/* && sudo apt update 
-        # - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
+        - sudo rm -rf /var/lib/apt/lists/* && sudo apt update 
+        - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
       # script:
         - docker version
         - docker buildx version
@@ -31,10 +31,10 @@ jobs:
 
     - stage: Build amd64 AWX-Receptor
       python: 3.9
-      services: docker
+      # services: docker
       before_install:
-        # - sudo rm -rf /var/lib/apt/lists/* && sudo apt update 
-        # - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
+        - sudo rm -rf /var/lib/apt/lists/* && sudo apt update 
+        - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
       # script:
         - docker version
         - docker buildx version
@@ -54,10 +54,10 @@ jobs:
 
     - stage: Build arm64 AWX-Receptor
       python: 3.9
-      services: docker
+      # services: docker
       before_install:
-        # - sudo rm -rf /var/lib/apt/lists/* && sudo apt update 
-        # - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
+        - sudo rm -rf /var/lib/apt/lists/* && sudo apt update 
+        - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
       # script:
         - docker version
         - docker buildx version
