@@ -6,7 +6,7 @@
 arch:
   - amd64
   # - ppc64le
-  - linux-s390x
+  # - linux-s390x
   - arm64
 
 # os: 
