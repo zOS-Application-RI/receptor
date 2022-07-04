@@ -31,7 +31,7 @@ endif
 # no_workceptor:  Disable the unit-of-work subsystem (be network only)
 #
 # no_cert_auth:   Disable commands related to CA and certificate generation
-PLATFORM :=
+
 TAGS ?=
 ifeq ($(TAGS),)
 	TAGPARAM=
@@ -132,7 +132,7 @@ REPO := docker.io/ashish1981/receptor
 TAG := $(subst +,-,$(VERSION))
 # Set this to tag image as :latest in addition to :$(VERSION)
 LATEST :
-
+PLATFORM :
 container: .container-flag-$(VERSION)
 .container-flag-$(VERSION): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
 	@tar --exclude-vcs-ignores -czf packaging/container/source.tar.gz .
@@ -147,8 +147,7 @@ container: .container-flag-$(VERSION)
 	$(CONTAINERCMD) buildx build packaging/container \
 	--platform=$(PLATFORM) --push \
 	--build-arg VERSION=$(VERSION:v%=%) \
-	-t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,) \
-	# --progress=plain \	
+	-t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,) --progress=plain \	
 	--cache-from=$(REPO):$(TAG)
 	@touch .container-flag-$(VERSION)
 

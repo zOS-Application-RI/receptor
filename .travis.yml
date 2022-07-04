@@ -25,9 +25,9 @@ jobs:
         - export DEPLOY_TIMESTAMP=`date +'%Y%m%d-%H%M%S'`
         - export git_repo=$(echo $TRAVIS_REPO_SLUG |  awk -F"/" '{print tolower($2)}')
         - export TAG=s390x
-        - export PLATFORM=linux/$(TAG)
+        - export PLATFORM=linux/${TAG}
       script: 
-        -  make container PLATFORM=`$(PLATFORM)` OFFICIAL_VERSION=yes TAG=${TAG} CONTAINERCMD=docker REPO=docker.io/$DOCKER_USERNAME/${git_repo} VERSION=v1.2.4 LATEST=no
+        -  make container PLATFORM=${PLATFORM} OFFICIAL_VERSION=yes TAG=${TAG} CONTAINERCMD=docker REPO=docker.io/$DOCKER_USERNAME/${git_repo} VERSION=v1.2.4 LATEST=no
       after_script:
         - echo "Script completed on" DEPLOY_TIMESTAMP
     
