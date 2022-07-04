@@ -7,14 +7,14 @@ dist: focal
 #       - pip3
 
 before_install:
-  - sudo apt update && sudo apt upgrade -y
+  - sudo rm -rf /var/lib/apt/lists/* && sudo apt update && sudo apt upgrade -y
   - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
 # script:
   - docker version
   - docker buildx version
   - docker buildx create --use --bootstrap
   - docker buildx ls
-  - sudo apt update && sudo apt upgrade -y
+  - sudo apt clean && sudo apt update && sudo apt upgrade -y
   - sudo apt install build-essential libncurses5-dev zlib1g-dev libnss3-dev libgdbm-dev libssl-dev libsqlite3-dev libffi-dev libreadline-dev curl libbz2-dev -y
   - sudo add-apt-repository -y ppa:deadsnakes/ppa
   - sudo apt update && sudo apt install -y python3.9 python3.9-dev python3.9-venv pip3
