@@ -31,7 +31,7 @@ endif
 # no_workceptor:  Disable the unit-of-work subsystem (be network only)
 #
 # no_cert_auth:   Disable commands related to CA and certificate generation
-PLATFORM ?=
+PLATFORM :=
 TAGS ?=
 ifeq ($(TAGS),)
 	TAGPARAM=
