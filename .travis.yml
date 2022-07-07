@@ -13,7 +13,7 @@ jobs:
       before_install:
         - sudo rm -rf /var/lib/apt/lists/* && sudo apt update 
         - sudo apt install -y build-essential && sudo add-apt-repository -y ppa:deadsnakes/ppa
-        - sudo apt update && sudo apt install -y python3.9 python3.9-dev python3-venv
+        - sudo apt update && sudo apt remove -y python3 && sudo apt install -y python3.9 python3.9-dev python3.9-venv
         - python3 -m pip install --no-cache-dir -U pip build virtualenv
         - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
       # script:
