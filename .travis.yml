@@ -1,6 +1,7 @@
+os: linux-s390
 jobs:
   include:
-    - os: linux-s390
+    # - os: linux-s390
       # language: python
       # python:
       #   - "3.9"
