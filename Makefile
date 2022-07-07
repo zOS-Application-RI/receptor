@@ -147,10 +147,7 @@ container: .container-flag-$(VERSION)
 	
 	# buildx build --platform=$(PLATFORM) --push \
 	
-	$(CONTAINERCMD) \ 
-			build \
-			packaging/container --build-arg VERSION=$(VERSION:v%=%) \
-			-t $(REPO):$(TAG) --cache-from=$(REPO):$(TAG) 
+	$(CONTAINERCMD) build packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):$(TAG) --cache-from=$(REPO):$(TAG) 
 
 	$(CONTAINERCMD) push $(REPO):$(TAG)
 
