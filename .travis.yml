@@ -37,7 +37,7 @@ jobs:
         - export TAG=s390x
         - export PLATFORM=linux/${TAG}
       script: 
-        -  make container PLATFORM=${PLATFORM} OFFICIAL_VERSION=yes TAG=${TAG} CONTAINERCMD=docker REPO=docker.io/$DOCKER_USERNAME/${git_repo} VERSION=v1.2.4 LATEST=no
+        -  make container PLATFORM=${PLATFORM} OFFICIAL_VERSION=yes TAG=${TAG} CONTAINERCMD=docker REPO=docker.io/$DOCKER_USERNAME/${git_repo} VERSION=v1.2.3 LATEST=no
       after_script:
         - echo "Script completed on" DEPLOY_TIMESTAMP
     
