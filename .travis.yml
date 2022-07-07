@@ -1,10 +1,10 @@
 jobs:
   include:
     - os: linux-s390
-      language: python
-      python:
-        - "3.9"
-      dist: focal
+      # language: python
+      # python:
+      #   - "3.9"
+      # dist: focal
     - stage: Build s390x AWX-Receptor
       
       # python: 3.9
