@@ -1,10 +1,12 @@
-language: python
-python:
-  - "3.9"
-dist: focal
 jobs:
   include:
+    - os: linux-s390
+      language: python
+      python:
+        - "3.9"
+      dist: focal
     - stage: Build s390x AWX-Receptor
+      
       # python: 3.9
       # services: docker
       before_install:
@@ -32,71 +34,71 @@ jobs:
         - echo "Script completed on" DEPLOY_TIMESTAMP
     
 
-    - stage: Build amd64 AWX-Receptor
-      # python: 3.9
-      # services: docker
-      before_install:
-        - sudo rm -rf /var/lib/apt/lists/* && sudo apt update 
-        - sudo apt install -y build-essential && sudo add-apt-repository -y ppa:deadsnakes/ppa
-        - sudo apt update && sudo apt install -y python3.9 python3.9-dev python3.9-venv
-        - python3 -m pip install --no-cache-dir -U pip build
-        - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
-      # script:
-        - docker version
-        - docker buildx version
-        - docker buildx create --use --bootstrap
-        - docker buildx ls
-      before_script: 
-        - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-        - export DEPLOY_TIMESTAMP=`date +'%Y%m%d-%H%M%S'`
-        - export git_repo=$(echo $TRAVIS_REPO_SLUG |  awk -F"/" '{print tolower($2)}')
-        - export TAG=amd64
-        - export PLATFORM=linux/$(TAG)
-      script: 
-        -  make container PLATFORM=$(PLATFORM) OFFICIAL_VERSION=yes TAG=${TAG} CONTAINERCMD=docker REPO=docker.io/$DOCKER_USERNAME/${git_repo} VERSION=v1.2.4 LATEST=no
-      after_script:
-        - echo "Script completed on" DEPLOY_TIMESTAMP
+    # - stage: Build amd64 AWX-Receptor
+    #   # python: 3.9
+    #   # services: docker
+    #   before_install:
+    #     - sudo rm -rf /var/lib/apt/lists/* && sudo apt update 
+    #     - sudo apt install -y build-essential && sudo add-apt-repository -y ppa:deadsnakes/ppa
+    #     - sudo apt update && sudo apt install -y python3.9 python3.9-dev python3.9-venv
+    #     - python3 -m pip install --no-cache-dir -U pip build
+    #     - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
+    #   # script:
+    #     - docker version
+    #     - docker buildx version
+    #     - docker buildx create --use --bootstrap
+    #     - docker buildx ls
+    #   before_script: 
+    #     - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+    #     - export DEPLOY_TIMESTAMP=`date +'%Y%m%d-%H%M%S'`
+    #     - export git_repo=$(echo $TRAVIS_REPO_SLUG |  awk -F"/" '{print tolower($2)}')
+    #     - export TAG=amd64
+    #     - export PLATFORM=linux/$(TAG)
+    #   script: 
+    #     -  make container PLATFORM=$(PLATFORM) OFFICIAL_VERSION=yes TAG=${TAG} CONTAINERCMD=docker REPO=docker.io/$DOCKER_USERNAME/${git_repo} VERSION=v1.2.4 LATEST=no
+    #   after_script:
+    #     - echo "Script completed on" DEPLOY_TIMESTAMP
 
-    - stage: Build arm64 AWX-Receptor
-      # python: 3.9
-      # services: docker
-      before_install:
-        - sudo rm -rf /var/lib/apt/lists/* && sudo apt update 
-        - sudo apt install -y build-essential && sudo add-apt-repository -y ppa:deadsnakes/ppa
-        - sudo apt update && sudo apt install -y python3.9 python3.9-dev python3.9-venv
-        - python3 -m pip install --no-cache-dir -U pip build
-        - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
-      # script:
-        - docker version
-        - docker buildx version
-        - docker buildx create --use --bootstrap
-        - docker buildx ls
-      before_script: 
-        - python3 -m pip install --no-cache-dir -U pip build
-        - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-        - export DEPLOY_TIMESTAMP=`date +'%Y%m%d-%H%M%S'`
-        - export git_repo=$(echo $TRAVIS_REPO_SLUG |  awk -F"/" '{print tolower($2)}')
-        - export TAG=arm64
-        - export PLATFORM=linux/$(TAG)
-      script: 
-        -  make container PLATFORM=$(PLATFORM) OFFICIAL_VERSION=yes TAG=${TAG} CONTAINERCMD=docker REPO=docker.io/$DOCKER_USERNAME/${git_repo} VERSION=v1.2.4 LATEST=no
-      after_script:
-        - echo "Script completed on" DEPLOY_TIMESTAMP
+    # - stage: Build arm64 AWX-Receptor
+    #   # python: 3.9
+    #   # services: docker
+    #   before_install:
+    #     - sudo rm -rf /var/lib/apt/lists/* && sudo apt update 
+    #     - sudo apt install -y build-essential && sudo add-apt-repository -y ppa:deadsnakes/ppa
+    #     - sudo apt update && sudo apt install -y python3.9 python3.9-dev python3.9-venv
+    #     - python3 -m pip install --no-cache-dir -U pip build
+    #     - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
+    #   # script:
+    #     - docker version
+    #     - docker buildx version
+    #     - docker buildx create --use --bootstrap
+    #     - docker buildx ls
+    #   before_script: 
+    #     - python3 -m pip install --no-cache-dir -U pip build
+    #     - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+    #     - export DEPLOY_TIMESTAMP=`date +'%Y%m%d-%H%M%S'`
+    #     - export git_repo=$(echo $TRAVIS_REPO_SLUG |  awk -F"/" '{print tolower($2)}')
+    #     - export TAG=arm64
+    #     - export PLATFORM=linux/$(TAG)
+    #   script: 
+    #     -  make container PLATFORM=$(PLATFORM) OFFICIAL_VERSION=yes TAG=${TAG} CONTAINERCMD=docker REPO=docker.io/$DOCKER_USERNAME/${git_repo} VERSION=v1.2.4
+    #   after_script:
+    #     - echo "Script completed on" DEPLOY_TIMESTAMP
     
-    - stage: Merge Manifests
-      services: docker
-      before_install:
-      #   - sudo rm -rf /var/lib/apt/lists/* && sudo apt update 
-      #   - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
-      # # script:
-        - docker version
-      script: 
-        - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-        - export DEPLOY_TIMESTAMP=`date +'%Y%m%d-%H%M%S'`
-        - export git_repo=$(echo $TRAVIS_REPO_SLUG |  awk -F"/" '{print tolower($2)}')
-      after_script: 
-        - docker manifest create docker.io/$DOCKER_USERNAME/${git_repo}:latest \
-            --amend docker.io/$DOCKER_USERNAME/${git_repo}:arm64 \
-            --amend docker.io/$DOCKER_USERNAME/${git_repo}:amd64 \
-            --amend docker.io/$DOCKER_USERNAME/${git_repo}:s390x 
-        - docker manifest push docker.io/$DOCKER_USERNAME/${git_repo}:latest
+    # - stage: Merge Manifests
+    #   services: docker
+    #   before_install:
+    #   #   - sudo rm -rf /var/lib/apt/lists/* && sudo apt update 
+    #   #   - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
+    #   # # script:
+    #     - docker version
+    #   script: 
+    #     - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+    #     - export DEPLOY_TIMESTAMP=`date +'%Y%m%d-%H%M%S'`
+    #     - export git_repo=$(echo $TRAVIS_REPO_SLUG |  awk -F"/" '{print tolower($2)}')
+    #   after_script: 
+    #     - docker manifest create docker.io/$DOCKER_USERNAME/${git_repo}:latest \
+    #         --amend docker.io/$DOCKER_USERNAME/${git_repo}:arm64 \
+    #         --amend docker.io/$DOCKER_USERNAME/${git_repo}:amd64 \
+    #         --amend docker.io/$DOCKER_USERNAME/${git_repo}:s390x 
+    #     - docker manifest push docker.io/$DOCKER_USERNAME/${git_repo}:latest
