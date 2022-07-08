@@ -133,6 +133,16 @@ TAG := $(subst +,-,$(VERSION))
 # Set this to tag image as :latest in addition to :$(VERSION)
 LATEST :=
 PLATFORM := 
+
+container: .container-flag-$(VERSION)
+.container-flag-$(VERSION): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
+	@tar --exclude-vcs-ignores -czf packaging/container/source.tar.gz .
+	@cp $(RECEPTORCTL_WHEEL) packaging/container
+	@cp $(RECEPTOR_PYTHON_WORKER_WHEEL) packaging/container
+	$(CONTAINERCMD) build packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,) --cache-from=type=registry,ref=$(REPO):$(TAG) --cache-to=type=registry,ref=$(REPO):buildcache 
+	$(CONTAINERCMD) push $(REPO):$(TAG)
+	@touch .container-flag-$(VERSION)
+
 container-s390x: .container-flag-$(VERSION)
 .container-flag-$(VERSION): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
 	@tar --exclude-vcs-ignores -czf packaging/container/source.tar.gz .
@@ -174,4 +184,4 @@ clean:
 	@rm -rfv receptorctl-test-venv/
 	@rm -fv kubectl
 
-.PHONY: lint format fmt pre-commit build-all test clean testloop container version receptorctl-tests kubetest receptorctl/.VERSION receptor-python-worker/.VERSION
+.PHONY: lint format fmt pre-commit build-all test clean testloop container container-s390x container-arm64 container-amd64 version receptorctl-tests kubetest receptorctl/.VERSION receptor-python-worker/.VERSION

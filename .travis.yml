@@ -28,17 +28,18 @@ jobs:
         - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
         - sudo apt-get install binfmt-support qemu-user-static
         
+        - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+        - export DEPLOY_TIMESTAMP=`date +'%Y%m%d-%H%M%S'`
+        - export git_repo=$(echo $TRAVIS_REPO_SLUG |  awk -F"/" '{print tolower($2)}')        
       # script:
         - docker version
         - docker buildx install
         - docker buildx version
-        # - docker run --privileged --rm tonistiigi/binfmt --install all
-        - docker buildx create --driver-opt image=moby/buildkit --use
-        # - docker buildx create --platform linux/amd64,linux/arm64 --use
+        - docker run --privileged --rm tonistiigi/binfmt --install all
+        # - docker buildx create --driver-opt image=moby/buildkit --use
+        - docker buildx create --platform linux/amd64,linux/arm64 --use --bootstrap
         - docker buildx ls
-        -  echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-        -  export DEPLOY_TIMESTAMP=`date +'%Y%m%d-%H%M%S'`
-        -  export git_repo=$(echo $TRAVIS_REPO_SLUG |  awk -F"/" '{print tolower($2)}')
+
 
       before_script: 
         # - sudo apt install -y pip3
