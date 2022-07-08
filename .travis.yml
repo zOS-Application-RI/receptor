@@ -24,6 +24,7 @@ jobs:
           python3.9 
           python3.9-dev 
           python3.9-venv
+          python3-pip
         - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
         - sudo apt-get install binfmt-support qemu-user-static
         - sudo python3 -m pip install --no-cache-dir -U pip build virtualenv        
