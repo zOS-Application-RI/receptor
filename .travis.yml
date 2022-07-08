@@ -9,7 +9,7 @@ jobs:
       # python:
       #   - "3.9"
       # dist: focal
-    - stage: Build s390x AWX-Receptor
+    - stage: Build MultiArch AWX-Receptor
       
       # python: 3.9
       # services: docker
@@ -35,7 +35,7 @@ jobs:
         - docker buildx version
         # - docker run --privileged --rm tonistiigi/binfmt --install all
         # - docker buildx create --driver-opt image=moby/buildkit --use
-        - docker buildx create --platform linux/amd64,linux/arm64 --use --bootstrap
+        - docker buildx create --use --bootstrap
         - docker buildx ls
 
         - sudo apt install -y build-essential && sudo add-apt-repository -y ppa:deadsnakes/ppa
