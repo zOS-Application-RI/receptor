@@ -51,7 +51,7 @@ jobs:
       script: 
         # -  export TAG=s390x
         # -  export PLATFORM=linux/${TAG}
-        -  make container OFFICIAL_VERSION=yes TAG=${TAG} CONTAINERCMD=docker REPO=docker.io/$DOCKER_USERNAME/${git_repo} VERSION=v1.2.3
+        -  make container OFFICIAL_VERSION=yes CONTAINERCMD=docker REPO=docker.io/$DOCKER_USERNAME/${git_repo} VERSION=v1.2.3
 
       # after_script: 
       #   -  export TAG=amd64
