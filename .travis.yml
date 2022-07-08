@@ -15,7 +15,6 @@ jobs:
       # services: docker
       before_install:
         - sudo rm -rf /var/lib/apt/lists/* && sudo apt update 
-        - sudo apt install -y build-essential && sudo add-apt-repository -y ppa:deadsnakes/ppa
         # - sudo apt update && 
         #   sudo apt remove -y python3 && sudo apt autoremove -y &&
         #   sudo apt install -y
@@ -24,7 +23,6 @@ jobs:
         #   python3.9 
         #   python3.9-dev 
         #   python3.9-venv
-        - sudo python3 -m pip install --no-cache-dir -U pip build virtualenv
         - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
         - sudo apt-get install binfmt-support qemu-user-static
         
@@ -35,10 +33,13 @@ jobs:
         - docker version
         - docker buildx install
         - docker buildx version
-        - docker run --privileged --rm tonistiigi/binfmt --install all
+        # - docker run --privileged --rm tonistiigi/binfmt --install all
         # - docker buildx create --driver-opt image=moby/buildkit --use
         - docker buildx create --platform linux/amd64,linux/arm64 --use --bootstrap
         - docker buildx ls
+
+        - sudo apt install -y build-essential && sudo add-apt-repository -y ppa:deadsnakes/ppa
+        - sudo python3 -m pip install --no-cache-dir -U pip build virtualenv
 
 
       before_script: 
