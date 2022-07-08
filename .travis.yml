@@ -14,6 +14,8 @@ jobs:
       # services: docker
       before_install:
         - sudo rm -rf /var/lib/apt/lists/* && sudo apt update 
+        - sudo apt install -y build-essential && sudo add-apt-repository -y ppa:deadsnakes/ppa
+        - sudo python3 -m pip install --no-cache-dir -U pip build virtualenv
         - sudo apt update && 
           sudo apt remove -y python3 && sudo apt autoremove -y &&
           sudo apt install -y
@@ -34,12 +36,8 @@ jobs:
         - docker buildx version
         # - docker run --privileged --rm tonistiigi/binfmt --install all
         # - docker buildx create --driver-opt image=moby/buildkit --use
-        - docker buildx create mybuilder --use --bootstrap
+        - docker buildx create mybuilder--use --bootstrap
         - docker buildx ls
-
-        - sudo apt install -y build-essential && sudo add-apt-repository -y ppa:deadsnakes/ppa
-        - sudo python3 -m pip install --no-cache-dir -U pip build virtualenv
-
 
       # before_script: 
       #   # - sudo apt install -y pip3
