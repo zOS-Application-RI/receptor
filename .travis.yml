@@ -31,19 +31,30 @@ jobs:
         - docker buildx version
         - docker buildx create --use --bootstrap
         - docker buildx ls
-
       before_script: 
         # - sudo apt install -y pip3
         - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
         - export DEPLOY_TIMESTAMP=`date +'%Y%m%d-%H%M%S'`
         - export git_repo=$(echo $TRAVIS_REPO_SLUG |  awk -F"/" '{print tolower($2)}')
-        - export TAG=s390x
-        - export PLATFORM=linux/${TAG}
       script: 
-        -  make container PLATFORM=${PLATFORM} OFFICIAL_VERSION=yes TAG=${TAG} CONTAINERCMD=docker REPO=docker.io/$DOCKER_USERNAME/${git_repo} VERSION=v1.2.3
-      after_script:
-        - echo "Script completed on" DEPLOY_TIMESTAMP
-    
+        -  export TAG=s390x
+        -  export PLATFORM=linux/${TAG}
+        -  make container-${TAG} PLATFORM=${PLATFORM} OFFICIAL_VERSION=yes TAG=${TAG} CONTAINERCMD=docker REPO=docker.io/$DOCKER_USERNAME/${git_repo} VERSION=v1.2.3
+
+        -  export TAG=amr64
+        -  export PLATFORM=linux/${TAG}
+        -  make container-${TAG} PLATFORM=${PLATFORM} OFFICIAL_VERSION=yes TAG=${TAG} CONTAINERCMD=docker REPO=docker.io/$DOCKER_USERNAME/${git_repo} VERSION=v1.2.3
+
+        -  export TAG=amd64
+        -  export PLATFORM=linux/${TAG}
+        -  make container-${TAG} PLATFORM=${PLATFORM} OFFICIAL_VERSION=yes TAG=${TAG} CONTAINERCMD=docker REPO=docker.io/$DOCKER_USERNAME/${git_repo} VERSION=v1.2.3
+
+      after_script: 
+        - docker manifest create docker.io/$DOCKER_USERNAME/${git_repo}:latest \
+            --amend docker.io/$DOCKER_USERNAME/${git_repo}:arm64 \
+            --amend docker.io/$DOCKER_USERNAME/${git_repo}:amd64 \
+            --amend docker.io/$DOCKER_USERNAME/${git_repo}:s390x 
+        - docker manifest push docker.io/$DOCKER_USERNAME/${git_repo}:latest    
 
     # - stage: Build amd64 AWX-Receptor
     #   # python: 3.9

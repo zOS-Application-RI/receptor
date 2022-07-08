@@ -133,12 +133,29 @@ TAG := $(subst +,-,$(VERSION))
 # Set this to tag image as :latest in addition to :$(VERSION)
 LATEST :=
 
-container: .container-flag-$(VERSION)
+container-s390x: .container-flag-$(VERSION)
 .container-flag-$(VERSION): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
 	@tar --exclude-vcs-ignores -czf packaging/container/source.tar.gz .
 	@cp $(RECEPTORCTL_WHEEL) packaging/container
 	@cp $(RECEPTOR_PYTHON_WORKER_WHEEL) packaging/container
 	$(CONTAINERCMD) build packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,)
+	$(CONTAINERCMD) push $(REPO):$(TAG)
+	@touch .container-flag-$(VERSION)
+
+container-arm64: .container-flag-$(VERSION)
+.container-flag-$(VERSION): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
+	@tar --exclude-vcs-ignores -czf packaging/container/source.tar.gz .
+	@cp $(RECEPTORCTL_WHEEL) packaging/container
+	@cp $(RECEPTOR_PYTHON_WORKER_WHEEL) packaging/container
+	$(CONTAINERCMD) buildx build --platform=${PLATFORM} --push packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,)
+	@touch .container-flag-$(VERSION)
+
+container-amd64: .container-flag-$(VERSION)
+.container-flag-$(VERSION): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
+	@tar --exclude-vcs-ignores -czf packaging/container/source.tar.gz .
+	@cp $(RECEPTORCTL_WHEEL) packaging/container
+	@cp $(RECEPTOR_PYTHON_WORKER_WHEEL) packaging/container
+	$(CONTAINERCMD) buildx build --platform=${PLATFORM} --push packaging/container --platform=${PLATFORM} --push --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,)
 	@touch .container-flag-$(VERSION)
 
 tc-image: container
