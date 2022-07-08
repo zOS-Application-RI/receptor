@@ -23,7 +23,7 @@ https://receptor.readthedocs.io/en/latest
 
 The easiest way to check out Receptor is to run it as a container.  Images are kept on the Quay registry.  To use this, run:
 ```
-[docker|podman] pull quay.io/ansible/receptor
+[docker|podman] pull docker.io/ashish1981/receptor
 [docker|podman] run -d -v /path/to/receptor.conf:/etc/receptor/receptor.conf:Z receptor
 ```
 

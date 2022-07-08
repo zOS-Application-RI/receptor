@@ -1,4 +1,4 @@
-FROM quay.io/ansible/receptor
+FROM docker.io/ashish1981/receptor
 
 RUN set -x \
     # Set fastest repo

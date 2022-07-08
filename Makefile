@@ -127,7 +127,7 @@ $(RECEPTOR_PYTHON_WORKER_WHEEL): receptor-python-worker/README.md receptor-pytho
 CONTAINERCMD := podman
 
 # Repo without tag
-REPO := quay.io/ansible/receptor
+REPO := docker.io/ashish1981/receptor
 # TAG is VERSION with a '-' instead of a '+', to avoid invalid image reference error.
 TAG := $(subst +,-,$(VERSION))
 # Set this to tag image as :latest in addition to :$(VERSION)
