@@ -30,7 +30,7 @@ jobs:
         - docker version
         - docker buildx install
         - docker buildx version
-        - docker buildx create --platform linux/amd64,linux.arm64 --use
+        - docker buildx create --platform linux/amd64,linux/arm64 --use
         - docker buildx ls
       before_script: 
         # - sudo apt install -y pip3
