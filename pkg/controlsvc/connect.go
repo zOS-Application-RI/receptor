@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.ibm.com/s390x-images/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 type (

@@ -1,6 +1,6 @@
 # If the current commit has been tagged, use that as the version.
 # Otherwise include short commit hash.
-OFFICIAL_VERSION := $(shell if VER=`git describe --exact-match --tags 2>/dev/null`; then echo $$VER; else echo "yes"; fi)
+OFFICIAL_VERSION := $(shell if VER=`git describe --exact-match --tags 2>/dev/null`; then echo $$VER; else echo ""; fi)
 ifeq ($(OFFICIAL_VERSION),)
 VERSION := $(shell git describe --tags | cut -d - -f -1)+g$(shell git rev-parse --short HEAD)
 else
@@ -47,7 +47,7 @@ else
 endif
 
 receptor: $(shell find pkg -type f -name '*.go') ./cmd/receptor-cl/receptor.go
-	CGO_ENABLED=0 go build -o receptor $(DEBUGFLAGS) -ldflags "-X 'github.ibm.com/s390x-images/receptor/internal/version.Version=$(VERSION)'" $(TAGPARAM) ./cmd/receptor-cl
+	CGO_ENABLED=0 go build -o receptor $(DEBUGFLAGS) -ldflags "-X 'github.com/ansible/receptor/internal/version.Version=$(VERSION)'" $(TAGPARAM) ./cmd/receptor-cl
 
 lint:
 	@golint cmd/... pkg/... example/...
@@ -124,36 +124,22 @@ $(RECEPTOR_PYTHON_WORKER_WHEEL): receptor-python-worker/README.md receptor-pytho
 	@cd receptor-python-worker && python3 -m build --wheel
 
 # Container command can be docker or podman
-CONTAINERCMD := docker
+CONTAINERCMD := podman
 
 # Repo without tag
-REPO := docker.io/ashish1981/receptor
+REPO := quay.io/ansible/receptor
 # TAG is VERSION with a '-' instead of a '+', to avoid invalid image reference error.
 TAG := $(subst +,-,$(VERSION))
 # Set this to tag image as :latest in addition to :$(VERSION)
-LATEST :
-PLATFORM :
+LATEST :=
+
 container: .container-flag-$(VERSION)
 .container-flag-$(VERSION): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
 	@tar --exclude-vcs-ignores -czf packaging/container/source.tar.gz .
 	@cp $(RECEPTORCTL_WHEEL) packaging/container
 	@cp $(RECEPTOR_PYTHON_WORKER_WHEEL) packaging/container
-	# $(CONTAINERCMD) build packaging/container \
-	# --platform=linux/arm64,linux/s390x,linux/amd64 --push \
-	# --build-arg VERSION=$(VERSION:v%=%) \
-	# -t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,) \
-	# --progress=plain \
-	# --cache-from=$(REPO):$(TAG)
-	
-	# buildx build --platform=$(PLATFORM) --push \
-	
-	$(CONTAINERCMD) build packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):$(TAG) --cache-from=$(REPO):$(TAG) 
-
-	$(CONTAINERCMD) push $(REPO):$(TAG)
-
+	$(CONTAINERCMD) build packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,)
 	@touch .container-flag-$(VERSION)
-	
- 
 
 tc-image: container
 	@cp receptor packaging/tc-image/

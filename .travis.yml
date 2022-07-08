@@ -1,4 +1,7 @@
 os: linux-s390
+branches:
+  only:
+  - devel
 jobs:
   include:
     # - os: linux-s390

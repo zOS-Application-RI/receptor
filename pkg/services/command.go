@@ -8,12 +8,12 @@ import (
 	"net"
 	"os/exec"
 
+	"github.com/ansible/receptor/pkg/logger"
+	"github.com/ansible/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/utils"
 	"github.com/creack/pty"
 	"github.com/ghjm/cmdline"
 	"github.com/google/shlex"
-	"github.ibm.com/s390x-images/receptor/pkg/logger"
-	"github.ibm.com/s390x-images/receptor/pkg/netceptor"
-	"github.ibm.com/s390x-images/receptor/pkg/utils"
 )
 
 func runCommand(qc net.Conn, command string) error {

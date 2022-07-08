@@ -12,12 +12,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ansible/receptor/pkg/logger"
+	"github.com/ansible/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
 	"github.com/songgao/water"
 	"github.com/vishvananda/netlink"
-	"github.ibm.com/s390x-images/receptor/pkg/logger"
-	"github.ibm.com/s390x-images/receptor/pkg/netceptor"
-	"github.ibm.com/s390x-images/receptor/pkg/utils"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
 )

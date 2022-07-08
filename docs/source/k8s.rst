@@ -30,7 +30,7 @@ foo.yml
 
 kubeitpod.yml
 
-Note at this time it is necessary to have either a tcp-listener or a tcp-peer to be able to start the control service. See https://github.ibm.com/s390x-images/receptor/issues/518
+Note at this time it is necessary to have either a tcp-listener or a tcp-peer to be able to start the control service. See https://github.com/ansible/receptor/issues/518
 
 .. code-block:: yaml
 

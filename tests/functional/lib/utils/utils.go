@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.ibm.com/s390x-images/receptor/pkg/certificates"
+	"github.com/ansible/receptor/pkg/certificates"
 )
 
 var (

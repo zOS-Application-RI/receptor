@@ -16,8 +16,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ansible/receptor/pkg/logger"
 	"github.com/lucas-clemente/quic-go"
-	"github.ibm.com/s390x-images/receptor/pkg/logger"
 )
 
 // MaxIdleTimeoutForQuicConnections for quic connections. The default is 30 which we have replicated here.
@@ -271,7 +271,7 @@ func (li *Listener) Addr() net.Addr {
 type Conn struct {
 	s        *Netceptor
 	pc       *PacketConn
-	qc       quic.Session
+	qc       quic.Connection
 	qs       quic.Stream
 	doneChan chan struct{}
 	doneOnce *sync.Once

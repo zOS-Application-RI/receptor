@@ -16,10 +16,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ansible/receptor/pkg/logger"
+	"github.com/ansible/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
-	"github.ibm.com/s390x-images/receptor/pkg/logger"
-	"github.ibm.com/s390x-images/receptor/pkg/netceptor"
-	"github.ibm.com/s390x-images/receptor/pkg/utils"
 )
 
 // sockControl implements the ControlFuncOperations interface that is passed back to control functions.

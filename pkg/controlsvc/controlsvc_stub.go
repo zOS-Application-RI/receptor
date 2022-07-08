@@ -12,7 +12,7 @@ import (
 	"net"
 	"os"
 
-	"github.ibm.com/s390x-images/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 // ErrNotImplemented is returned by most functions in this unit since it is a non-functional stub

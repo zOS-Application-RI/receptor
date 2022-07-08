@@ -12,8 +12,8 @@ import (
 	"io/ioutil"
 	"strings"
 
+	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
-	"github.ibm.com/s390x-images/receptor/pkg/utils"
 )
 
 // **************************************************************************

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.ibm.com/s390x-images/receptor/tests/functional/lib/utils"
+	"github.com/ansible/receptor/tests/functional/lib/utils"
 )
 
 func ConfirmListening(pid int) (bool, error) {

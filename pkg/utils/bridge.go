@@ -4,7 +4,7 @@ import (
 	"io"
 	"strings"
 
-	"github.ibm.com/s390x-images/receptor/pkg/logger"
+	"github.com/ansible/receptor/pkg/logger"
 )
 
 // NormalBufferSize is the size of buffers used by various processes when copying data between sockets.
@@ -15,6 +15,7 @@ func BridgeConns(c1 io.ReadWriteCloser, c1Name string, c2 io.ReadWriteCloser, c2
 	doneChan := make(chan bool)
 	go bridgeHalf(c1, c1Name, c2, c2Name, doneChan)
 	go bridgeHalf(c2, c2Name, c1, c1Name, doneChan)
+	<-doneChan
 	<-doneChan
 }
 

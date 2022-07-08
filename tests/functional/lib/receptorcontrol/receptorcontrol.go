@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.ibm.com/s390x-images/receptor/pkg/netceptor"
-	"github.ibm.com/s390x-images/receptor/pkg/workceptor"
-	"github.ibm.com/s390x-images/receptor/tests/functional/lib/utils"
+	"github.com/ansible/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/workceptor"
+	"github.com/ansible/receptor/tests/functional/lib/utils"
 )
 
 // ReceptorControl Connects to a control socket and provides basic commands.

@@ -1,9 +1,8 @@
-module github.ibm.com/s390x-images/receptor
+module github.com/ansible/receptor
 
 go 1.17
 
 require (
-	github.ibm.com/s390x-images/receptor v1.2.3
 	github.com/creack/pty v1.1.18
 	github.com/fortytw2/leaktest v1.3.0
 	github.com/fsnotify/fsnotify v1.5.4

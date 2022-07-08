@@ -5,7 +5,7 @@ import (
 	"io"
 	"net"
 
-	"github.ibm.com/s390x-images/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 // ControlCommandType is a type of command that can be run from the control service.

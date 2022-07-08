@@ -3,7 +3,7 @@ package mesh
 import (
 	"context"
 
-	"github.ibm.com/s390x-images/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/netceptor"
 )
 
 // Node Defines the interface for nodes made using the CLI, Library, and

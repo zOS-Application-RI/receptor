@@ -7,15 +7,15 @@ import (
 	"strings"
 	"sync"
 
+	_ "github.com/ansible/receptor/internal/version"
+	_ "github.com/ansible/receptor/pkg/backends"
+	_ "github.com/ansible/receptor/pkg/certificates"
+	"github.com/ansible/receptor/pkg/controlsvc"
+	"github.com/ansible/receptor/pkg/logger"
+	"github.com/ansible/receptor/pkg/netceptor"
+	_ "github.com/ansible/receptor/pkg/services"
+	"github.com/ansible/receptor/pkg/workceptor"
 	"github.com/ghjm/cmdline"
-	_ "github.ibm.com/s390x-images/receptor/internal/version"
-	_ "github.ibm.com/s390x-images/receptor/pkg/backends"
-	_ "github.ibm.com/s390x-images/receptor/pkg/certificates"
-	"github.ibm.com/s390x-images/receptor/pkg/controlsvc"
-	"github.ibm.com/s390x-images/receptor/pkg/logger"
-	"github.ibm.com/s390x-images/receptor/pkg/netceptor"
-	_ "github.ibm.com/s390x-images/receptor/pkg/services"
-	"github.ibm.com/s390x-images/receptor/pkg/workceptor"
 )
 
 type nodeCfg struct {

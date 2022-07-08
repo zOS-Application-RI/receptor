@@ -19,4 +19,3 @@ kubectl
 /receptorctl/venv/
 .vagrant/
 /docs/build
-vendor

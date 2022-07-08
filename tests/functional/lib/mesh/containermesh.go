@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.ibm.com/s390x-images/receptor/pkg/netceptor"
-	"github.ibm.com/s390x-images/receptor/tests/functional/lib/receptorcontrol"
-	"github.ibm.com/s390x-images/receptor/tests/functional/lib/utils"
+	"github.com/ansible/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/tests/functional/lib/receptorcontrol"
+	"github.com/ansible/receptor/tests/functional/lib/utils"
 	"gopkg.in/yaml.v2"
 )
 
