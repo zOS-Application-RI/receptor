@@ -49,7 +49,7 @@ jobs:
         -  export PLATFORM=linux/${TAG}
         -  make container-${TAG} PLATFORM=${PLATFORM} OFFICIAL_VERSION=yes TAG=${TAG} CONTAINERCMD=docker REPO=docker.io/$DOCKER_USERNAME/${git_repo} VERSION=v1.2.3
 
-      after_script: 
+      after_success: 
         - docker manifest create docker.io/$DOCKER_USERNAME/${git_repo}:latest \
             --amend docker.io/$DOCKER_USERNAME/${git_repo}:arm64 \
             --amend docker.io/$DOCKER_USERNAME/${git_repo}:amd64 \
