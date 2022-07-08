@@ -32,7 +32,8 @@ jobs:
         - docker version
         - docker buildx install
         - docker buildx version
-        - docker run --privileged --rm tonistiigi/binfmt --install all
+        # - docker run --privileged --rm tonistiigi/binfmt --install all
+        - docker buildx create --driver-opt image=moby/buildkit --use
         # - docker buildx create --platform linux/amd64,linux/arm64 --use
         - docker buildx ls
         -  echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
@@ -41,12 +42,12 @@ jobs:
 
       before_script: 
         # - sudo apt install -y pip3
-        -  export TAG=s390x
+        -  export TAG=amr64
         -  export PLATFORM=linux/${TAG}
         -  make container-${TAG} PLATFORM=${PLATFORM} OFFICIAL_VERSION=yes TAG=${TAG} CONTAINERCMD=docker REPO=docker.io/$DOCKER_USERNAME/${git_repo} VERSION=v1.2.3
 
       script: 
-        -  export TAG=amr64
+        -  export TAG=s390x
         -  export PLATFORM=linux/${TAG}
         -  make container-${TAG} PLATFORM=${PLATFORM} OFFICIAL_VERSION=yes TAG=${TAG} CONTAINERCMD=docker REPO=docker.io/$DOCKER_USERNAME/${git_repo} VERSION=v1.2.3
 
