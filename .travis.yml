@@ -1,4 +1,3 @@
-os: linux-s390
 branches:
   only:
   - devel
