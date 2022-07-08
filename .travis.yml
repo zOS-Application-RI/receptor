@@ -42,21 +42,21 @@ jobs:
         - sudo python3 -m pip install --no-cache-dir -U pip build virtualenv
 
 
-      before_script: 
-        # - sudo apt install -y pip3
-        -  export TAG=amr64
-        -  export PLATFORM=linux/${TAG}
-        -  make container-${TAG} PLATFORM=${PLATFORM} OFFICIAL_VERSION=yes TAG=${TAG} CONTAINERCMD=docker REPO=docker.io/$DOCKER_USERNAME/${git_repo} VERSION=v1.2.3
+      # before_script: 
+      #   # - sudo apt install -y pip3
+      #   -  export TAG=amr64
+      #   -  export PLATFORM=linux/${TAG}
+      #   -  make container-${TAG} PLATFORM=${PLATFORM} OFFICIAL_VERSION=yes TAG=${TAG} CONTAINERCMD=docker REPO=docker.io/$DOCKER_USERNAME/${git_repo} VERSION=v1.2.3
 
       script: 
-        -  export TAG=s390x
-        -  export PLATFORM=linux/${TAG}
-        -  make container-${TAG} PLATFORM=${PLATFORM} OFFICIAL_VERSION=yes TAG=${TAG} CONTAINERCMD=docker REPO=docker.io/$DOCKER_USERNAME/${git_repo} VERSION=v1.2.3
+        # -  export TAG=s390x
+        # -  export PLATFORM=linux/${TAG}
+        -  make container OFFICIAL_VERSION=yes TAG=${TAG} CONTAINERCMD=docker REPO=docker.io/$DOCKER_USERNAME/${git_repo} VERSION=v1.2.3
 
-      after_script: 
-        -  export TAG=amd64
-        -  export PLATFORM=linux/${TAG}
-        -  make container-${TAG} PLATFORM=${PLATFORM} OFFICIAL_VERSION=yes TAG=${TAG} CONTAINERCMD=docker REPO=docker.io/$DOCKER_USERNAME/${git_repo} VERSION=v1.2.3
+      # after_script: 
+      #   -  export TAG=amd64
+      #   -  export PLATFORM=linux/${TAG}
+      #   -  make container-${TAG} PLATFORM=${PLATFORM} OFFICIAL_VERSION=yes TAG=${TAG} CONTAINERCMD=docker REPO=docker.io/$DOCKER_USERNAME/${git_repo} VERSION=v1.2.3
 
       after_success: 
         - docker manifest create docker.io/$DOCKER_USERNAME/${git_repo}:latest \

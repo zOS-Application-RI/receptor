@@ -139,33 +139,13 @@ container: .container-flag-$(VERSION)
 	@tar --exclude-vcs-ignores -czf packaging/container/source.tar.gz .
 	@cp $(RECEPTORCTL_WHEEL) packaging/container
 	@cp $(RECEPTOR_PYTHON_WORKER_WHEEL) packaging/container
-	$(CONTAINERCMD) build packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,) --cache-from=type=registry,ref=$(REPO):$(TAG) --cache-to=type=registry,ref=$(REPO):buildcache 
+	
+	$(CONTAINERCMD) buildx build --platform=linux/arm64 packaging/container --build-arg VERSION=$(VERSION:v%=%) BUILDKIT_MULTI_PLATFORM=1 -t $(REPO):arm64 $(if $(LATEST),-t $(REPO):latest,) --cache-from=type=registry,ref=$(REPO):arm64 --cache-to=type=registry,ref=$(REPO):arm64-buildcache --push
+	$(CONTAINERCMD) buildx build --platform=linux/amd64 packaging/container --build-arg VERSION=$(VERSION:v%=%) BUILDKIT_MULTI_PLATFORM=1 -t $(REPO):amd64 $(if $(LATEST),-t $(REPO):latest,) --cache-from=type=registry,ref=$(REPO):amd64 --cache-to=type=registry,ref=$(REPO):amd64-buildcache --push 
+
+	$(CONTAINERCMD) build packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,) --cache-from=type=registry,ref=$(REPO):$(TAG) --cache-to=type=registry,ref=$(REPO):s390x-buildcache 
 	$(CONTAINERCMD) push $(REPO):$(TAG)
-	@touch .container-flag-$(VERSION)
-
-container-s390x: .container-flag-$(VERSION)
-.container-flag-$(VERSION): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
-	@tar --exclude-vcs-ignores -czf packaging/container/source.tar.gz .
-	@cp $(RECEPTORCTL_WHEEL) packaging/container
-	@cp $(RECEPTOR_PYTHON_WORKER_WHEEL) packaging/container
-	$(CONTAINERCMD) build packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,) --cache-from=type=registry,ref=$(REPO):$(TAG) --cache-to=type=registry,ref=$(REPO):buildcache 
-	$(CONTAINERCMD) push $(REPO):$(TAG)
-	@touch .container-flag-$(VERSION)
-
-container-arm64: .container-flag-$(VERSION)
-.container-flag-$(VERSION): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
-	@tar --exclude-vcs-ignores -czf packaging/container/source.tar.gz .
-	@cp $(RECEPTORCTL_WHEEL) packaging/container
-	@cp $(RECEPTOR_PYTHON_WORKER_WHEEL) packaging/container
-	$(CONTAINERCMD) buildx build --platform=${PLATFORM} --push packaging/container --build-arg VERSION=$(VERSION:v%=%) BUILDKIT_MULTI_PLATFORM=1 -t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,) --cache-from=type=registry,ref=$(REPO):$(TAG) --cache-to=type=registry,ref=$(REPO):buildcache 
-	@touch .container-flag-$(VERSION)
-
-container-amd64: .container-flag-$(VERSION)
-.container-flag-$(VERSION): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
-	@tar --exclude-vcs-ignores -czf packaging/container/source.tar.gz .
-	@cp $(RECEPTORCTL_WHEEL) packaging/container
-	@cp $(RECEPTOR_PYTHON_WORKER_WHEEL) packaging/container
-	$(CONTAINERCMD) buildx build --platform=${PLATFORM} --push packaging/container --platform=${PLATFORM} --push --build-arg VERSION=$(VERSION:v%=%) BUILDKIT_MULTI_PLATFORM=1 -t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,) --cache-from=type=registry,ref=$(REPO):$(TAG) --cache-to=type=registry,ref=$(REPO):buildcache 
+	
 	@touch .container-flag-$(VERSION)
 
 tc-image: container
