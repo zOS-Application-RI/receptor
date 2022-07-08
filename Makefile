@@ -139,9 +139,9 @@ container: .container-flag-$(VERSION)
 	@tar --exclude-vcs-ignores -czf packaging/container/source.tar.gz .
 	@cp $(RECEPTORCTL_WHEEL) packaging/container
 	@cp $(RECEPTOR_PYTHON_WORKER_WHEEL) packaging/container
-
-	BUILDKIT_MULTI_PLATFORM=1 $(CONTAINERCMD) buildx build --platform=linux/s390x packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):s390x $(if $(LATEST),-t $(REPO):latest,) --cache-from=type=registry,ref=$(REPO):s390x --cache-to=type=registry,ref=$(REPO):s390x-buildcache --push 
+	
 	BUILDKIT_MULTI_PLATFORM=1 $(CONTAINERCMD) buildx build --platform=linux/arm64 packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):arm64 $(if $(LATEST),-t $(REPO):latest,) --cache-from=type=registry,ref=$(REPO):arm64 --cache-to=type=registry,ref=$(REPO):arm64-buildcache --push
+	BUILDKIT_MULTI_PLATFORM=1 $(CONTAINERCMD) buildx build --platform=linux/s390x packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):s390x $(if $(LATEST),-t $(REPO):latest,) --cache-from=type=registry,ref=$(REPO):s390x --cache-to=type=registry,ref=$(REPO):s390x-buildcache --push 
 	BUILDKIT_MULTI_PLATFORM=1 $(CONTAINERCMD) buildx build --platform=linux/amd64 packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):amd64 $(if $(LATEST),-t $(REPO):latest,) --cache-from=type=registry,ref=$(REPO):amd64 --cache-to=type=registry,ref=$(REPO):amd64-buildcache --push 
 
 	
