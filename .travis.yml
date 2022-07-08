@@ -37,7 +37,7 @@ jobs:
         - docker buildx version
         # - docker run --privileged --rm tonistiigi/binfmt --install all
         # - docker buildx create --driver-opt image=moby/buildkit --use
-        - docker buildx create mybuilder--use --bootstrap
+        - docker buildx create --use --bootstrap
         - docker buildx ls
 
       # before_script: 
