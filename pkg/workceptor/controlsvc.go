@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ansible/receptor/pkg/controlsvc"
-	"github.com/ansible/receptor/pkg/netceptor"
+	"github.ibm.com/s390x-images/receptor/pkg/controlsvc"
+	"github.ibm.com/s390x-images/receptor/pkg/netceptor"
 )
 
 type workceptorCommandType struct {

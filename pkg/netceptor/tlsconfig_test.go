@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ansible/receptor/tests/functional/lib/utils"
+	"github.ibm.com/s390x-images/receptor/tests/functional/lib/utils"
 )
 
 // setup handle using hardcoded PEMs.

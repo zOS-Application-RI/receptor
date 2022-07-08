@@ -31,8 +31,8 @@ The easiest way to check out Receptor is to run it as a container.  Images are k
 
 This code can be imported and used from Go programs.  The main libraries are:
 
-* _Netceptor_: https://pkg.go.dev/github.com/ansible/receptor/pkg/netceptor
-* _Workceptor_: https://pkg.go.dev/github.com/ansible/receptor/pkg/workceptor
+* _Netceptor_: https://pkg.go.dev/github.ibm.com/s390x-images/receptor/pkg/netceptor
+* _Workceptor_: https://pkg.go.dev/github.ibm.com/s390x-images/receptor/pkg/workceptor
 
 See the `example/` directory for examples of using these libraries from Go.
 

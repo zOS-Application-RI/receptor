@@ -1,7 +1,7 @@
 Developer guide
 ================
 
-Receptor is an open source project that lives at https://github.com/ansible/receptor
+Receptor is an open source project that lives at https://github.ibm.com/s390x-images/receptor
 
 Testing
 ^^^^^^^

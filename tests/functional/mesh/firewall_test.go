@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ansible/receptor/tests/functional/lib/mesh"
-	"github.com/ansible/receptor/tests/functional/lib/receptorcontrol"
 	_ "github.com/fortytw2/leaktest"
+	"github.ibm.com/s390x-images/receptor/tests/functional/lib/mesh"
+	"github.ibm.com/s390x-images/receptor/tests/functional/lib/receptorcontrol"
 )
 
 func TestFirewall(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ansible/receptor/pkg/netceptor"
+	"github.ibm.com/s390x-images/receptor/pkg/netceptor"
 )
 
 func newCommandWorker(w *Workceptor, unitID string, workType string) WorkUnit {

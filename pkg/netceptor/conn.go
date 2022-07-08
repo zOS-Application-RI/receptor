@@ -16,8 +16,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ansible/receptor/pkg/logger"
 	"github.com/lucas-clemente/quic-go"
+	"github.ibm.com/s390x-images/receptor/pkg/logger"
 )
 
 // MaxIdleTimeoutForQuicConnections for quic connections. The default is 30 which we have replicated here.

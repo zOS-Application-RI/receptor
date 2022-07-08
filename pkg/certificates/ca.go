@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ansible/receptor/pkg/utils"
+	"github.ibm.com/s390x-images/receptor/pkg/utils"
 )
 
 // CertNames lists the subjectAltNames that can be assigned to a certificate or request.

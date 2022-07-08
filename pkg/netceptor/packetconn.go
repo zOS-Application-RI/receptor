@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/ansible/receptor/pkg/utils"
+	"github.ibm.com/s390x-images/receptor/pkg/utils"
 )
 
 // PacketConn implements the net.PacketConn interface via the Receptor network.

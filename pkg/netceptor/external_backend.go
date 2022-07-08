@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ansible/receptor/pkg/framer"
-	"github.com/ansible/receptor/pkg/utils"
 	"github.com/gorilla/websocket"
+	"github.ibm.com/s390x-images/receptor/pkg/framer"
+	"github.ibm.com/s390x-images/receptor/pkg/utils"
 )
 
 // ExternalBackend is a backend implementation for the situation when non-Receptor code

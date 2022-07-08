@@ -14,9 +14,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ansible/receptor/pkg/logger"
 	"github.com/fsnotify/fsnotify"
 	"github.com/rogpeppe/go-internal/lockedfile"
+	"github.ibm.com/s390x-images/receptor/pkg/logger"
 )
 
 // Work sleep constants.

@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ansible/receptor/pkg/backends"
-	"github.com/ansible/receptor/pkg/netceptor"
+	"github.ibm.com/s390x-images/receptor/pkg/backends"
+	"github.ibm.com/s390x-images/receptor/pkg/netceptor"
 )
 
 func TestQuicConnectTimeout(t *testing.T) {

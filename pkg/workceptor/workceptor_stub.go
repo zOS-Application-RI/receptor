@@ -9,8 +9,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ansible/receptor/pkg/controlsvc"
-	"github.com/ansible/receptor/pkg/netceptor"
+	"github.ibm.com/s390x-images/receptor/pkg/controlsvc"
+	"github.ibm.com/s390x-images/receptor/pkg/netceptor"
 )
 
 // ErrNotImplemented is returned from functions that are stubbed out

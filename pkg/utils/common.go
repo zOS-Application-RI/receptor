@@ -3,7 +3,7 @@ package utils
 import (
 	"crypto/x509"
 
-	"github.com/ansible/receptor/pkg/logger"
+	"github.ibm.com/s390x-images/receptor/pkg/logger"
 )
 
 func ParseReceptorNamesFromCert(cert *x509.Certificate, expectedHostname string) (bool, []string, error) {

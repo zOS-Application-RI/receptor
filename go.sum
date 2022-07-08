@@ -66,8 +66,8 @@ github.com/PuerkitoBio/purell v1.1.1/go.mod h1:c11w/QuzBsJSee3cPx9rAFu61PvFxuPbt
 github.com/PuerkitoBio/urlesc v0.0.0-20160726150825-5bd2802263f2/go.mod h1:uGdkoq3SwY9Y+13GIhn11/XLaGBb4BfwItxLd5jeuXE=
 github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578/go.mod h1:uGdkoq3SwY9Y+13GIhn11/XLaGBb4BfwItxLd5jeuXE=
 github.com/anmitsu/go-shlex v0.0.0-20161002113705-648efa622239/go.mod h1:2FmKhYUyUczH0OGQWaF5ceTx0UBShxjsH6f8oGKYe2c=
-github.com/ansible/receptor v1.2.3 h1:FZsuhs54CLmJo74DYhTjTSkyvc6NxBjU7KWthPUV4HU=
-github.com/ansible/receptor v1.2.3/go.mod h1:WgUupaDLOcgpwinyuAEWJmEz6wV3crtbm8G1DcUWiAM=
+github.ibm.com/s390x-images/receptor v1.2.3 h1:FZsuhs54CLmJo74DYhTjTSkyvc6NxBjU7KWthPUV4HU=
+github.ibm.com/s390x-images/receptor v1.2.3/go.mod h1:WgUupaDLOcgpwinyuAEWJmEz6wV3crtbm8G1DcUWiAM=
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=

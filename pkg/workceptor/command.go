@@ -13,9 +13,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ghjm/cmdline"
 	"github.com/google/shlex"
+	"github.ibm.com/s390x-images/receptor/pkg/logger"
 )
 
 // commandUnit implements the WorkUnit interface for the Receptor command worker plugin.

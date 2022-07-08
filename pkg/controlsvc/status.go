@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ansible/receptor/internal/version"
-	"github.com/ansible/receptor/pkg/netceptor"
-	"github.com/ansible/receptor/pkg/utils"
+	"github.ibm.com/s390x-images/receptor/internal/version"
+	"github.ibm.com/s390x-images/receptor/pkg/netceptor"
+	"github.ibm.com/s390x-images/receptor/pkg/utils"
 )
 
 type (

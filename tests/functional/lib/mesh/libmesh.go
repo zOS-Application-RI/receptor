@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ansible/receptor/pkg/backends"
-	"github.com/ansible/receptor/pkg/controlsvc"
-	"github.com/ansible/receptor/pkg/netceptor"
-	"github.com/ansible/receptor/tests/functional/lib/receptorcontrol"
-	"github.com/ansible/receptor/tests/functional/lib/utils"
+	"github.ibm.com/s390x-images/receptor/pkg/backends"
+	"github.ibm.com/s390x-images/receptor/pkg/controlsvc"
+	"github.ibm.com/s390x-images/receptor/pkg/netceptor"
+	"github.ibm.com/s390x-images/receptor/tests/functional/lib/receptorcontrol"
+	"github.ibm.com/s390x-images/receptor/tests/functional/lib/utils"
 	"gopkg.in/yaml.v2"
 )
 

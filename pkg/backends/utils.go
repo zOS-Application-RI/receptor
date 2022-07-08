@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ansible/receptor/pkg/logger"
-	"github.com/ansible/receptor/pkg/netceptor"
-	"github.com/ansible/receptor/pkg/utils"
+	"github.ibm.com/s390x-images/receptor/pkg/logger"
+	"github.ibm.com/s390x-images/receptor/pkg/netceptor"
+	"github.ibm.com/s390x-images/receptor/pkg/utils"
 )
 
 const (
