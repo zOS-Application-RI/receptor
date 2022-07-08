@@ -28,8 +28,9 @@ jobs:
         - curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh
       # script:
         - docker version
+        - docker buildx install
         - docker buildx version
-        - docker buildx create --use --bootstrap
+        - docker buildx create --platform linux/amd64,linux.arm64 --use
         - docker buildx ls
       before_script: 
         # - sudo apt install -y pip3
