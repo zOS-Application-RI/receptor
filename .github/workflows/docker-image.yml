@@ -2,30 +2,18 @@ name: Receptor CI/CD to Docker Hub
 
 on:
   push:
-    branches: [ main ]
+    branches: [ devel ]
   pull_request:
-    branches: [ main ]
-  # workflow_dispatch:
-  #   inputs:
-  #     version:
-  #       description: 'Version to release. (x.y.z) Will create a tag / draft release.'
-  #       required: true
-  #       default: ''
-  #     ref:
-  #       description: 'The ref to tag. Can be a branch name / SHA / etc.'
-  #       required: true
-  #       default: ''
-  #     confirm:
-  #       description: 'Are you sure? Set this to yes.'
-  #       required: true
-  #       default: 'yes'
+    branches: [ devel ]
+
 
 jobs:
   docker:
     runs-on: ubuntu-latest
-    # permissions:
-    #   packages: write
-    #   contents: write
+    permissions:
+      packages: write
+      contents: write
+
     steps:
       -
         name: Set up QEMU
@@ -33,9 +21,7 @@ jobs:
         with:
           image: tonistiigi/binfmt:latest
           platforms: all
-      # - 
-        # name: Linelint
-        # uses: fernandrone/linelint@0.0.4
+
       -
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2.0.0
@@ -58,20 +44,11 @@ jobs:
       - 
         name: Install dependencies
         run: |
-          python3 -m pip install build
+          python3 -m pip install -U pip build virtualenv
 
       -
         name: Checkout
         uses: actions/checkout@v3
-
-      -     
-        name: Cache Docker layers
-        uses: actions/cache@v3.0.4
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
 
       -
         name: Login to DockerHub
@@ -79,31 +56,28 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
-      # -
-      #   name: Build and push
-      #   uses: docker/build-push-action@v3.0.0
-      #   with:
-      #     context: ./
-      #     file: ./Dockerfile
-      #     push: true
-      #     platforms: linux/amd64, linux/arm64, linux/ppc64le, linux/s390x
-      #     # platforms: linux/amd64, linux/ppc64le, linux/s390x
-      #     # platforms: linux/amd64, linux/s390x
-      #     # platforms: linux/s390x
-      #     tags: ${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }}:latest, 
-      #           ${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }}:v1,
-      #           ${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }}:${{ steps.prep.outputs.BUILD_ID }}
-      #     labels: ${{ steps.meta.outputs.labels }}
-      #     cache-from: type=local,src=/tmp/.buildx-cache
-      #     cache-to: type=local,dest=/tmp/.buildx-cache
-      - name: Extract branch name
+
+      - 
+        name: Extract branch name
         shell: bash
         run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
         id: extract_branch
 
-      - name: Build container image
+      - 
+        name: Build container image
         run: |
-          make container OFFICIAL_VERSION=yes CONTAINERCMD=docker REPO=docker.io/${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }} VERSION=v1.2.4 LATEST=yes
+          make container OFFICIAL_VERSION=yes CONTAINERCMD=docker REPO=docker.io/${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }} VERSION=v1.2.3 
+
+      - 
+        name: Build Docker Manifest
+        run: |
+          docker manifest create docker.io/${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }}:latest --amend docker.io/${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }}:arm64 --amend docker.io/${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }}:s390x --amend docker.io/${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }}:amd64 
+
+      - 
+        name: Push Docker Manifest
+        run: |
+          docker manifest push docker.io/${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }}:latest
+
       -   
         name : Docker Scan Image
         id: scan
@@ -132,27 +106,15 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           image: ${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }}
-          args: --file=Dockerfile
+          args: --file=packaging/container/Dockerfile
 
-      # - name: Upload result to GitHub Code Scanning
-      #   uses: github/codeql-action/upload-sarif@v2
-      #   with:
-      #     sarif_file: snyk.sarif
+      - name: Upload result to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: snyk.sarif
 
       # - uses: ncipollo/release-action@v1
       #   with:
       #     # artifacts: "release.tar.gz,foo/*.txt"
       #     # bodyFile: "body.md"
       #     token: ${{ secrets.GITHUB_TOKEN }}          
-
-      - name: Create draft release
-        run: |
-          ansible-playbook tools/ansible/stage.yml \
-            -e version=${{ github.event.inputs.version }} \
-            -e repo=${{ github.repository_owner }}/receptor \
-            -e github_token=${{ secrets.GITHUB_TOKEN }} \
-            -e target_commitish=${{ github.event.inputs.ref }}
-
-      -
-        name: Image digest
-        run: echo ${{ steps.docker_build.outputs.digest }}
