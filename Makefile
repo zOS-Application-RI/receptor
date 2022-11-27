@@ -124,28 +124,26 @@ $(RECEPTOR_PYTHON_WORKER_WHEEL): receptor-python-worker/README.md receptor-pytho
 	@cd receptor-python-worker && python3 -m build --wheel
 
 # Container command can be docker or podman
-CONTAINERCMD := podman
+CONTAINERCMD ?= podman
 
 # Repo without tag
-REPO := docker.io/ashish1981/receptor
+REPO := quay.io/ansible/receptor
 # TAG is VERSION with a '-' instead of a '+', to avoid invalid image reference error.
 TAG := $(subst +,-,$(VERSION))
 # Set this to tag image as :latest in addition to :$(VERSION)
 LATEST :=
-PLATFORM := 
 
-container: .container-flag-$(VERSION)
-.container-flag-$(VERSION): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
+EXTRA_OPTS ?=
+
+space := $(subst ,, )
+CONTAINER_FLAG_FILE = .container-flag-$(VERSION)$(subst $(space),,$(subst /,,$(EXTRA_OPTS)))
+container: $(CONTAINER_FLAG_FILE)
+$(CONTAINER_FLAG_FILE): $(RECEPTORCTL_WHEEL) $(RECEPTOR_PYTHON_WORKER_WHEEL)
 	@tar --exclude-vcs-ignores -czf packaging/container/source.tar.gz .
 	@cp $(RECEPTORCTL_WHEEL) packaging/container
 	@cp $(RECEPTOR_PYTHON_WORKER_WHEEL) packaging/container
-	
-	BUILDKIT_MULTI_PLATFORM=1 $(CONTAINERCMD) buildx build --platform=linux/arm64 packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):arm64 $(if $(LATEST),-t $(REPO):latest,) --cache-from=type=registry,ref=$(REPO):arm64 --cache-to=type=registry,ref=$(REPO):arm64-buildcache --push
-	BUILDKIT_MULTI_PLATFORM=1 $(CONTAINERCMD) buildx build --platform=linux/s390x packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):s390x $(if $(LATEST),-t $(REPO):latest,) --cache-from=type=registry,ref=$(REPO):s390x --cache-to=type=registry,ref=$(REPO):s390x-buildcache --push 
-	BUILDKIT_MULTI_PLATFORM=1 $(CONTAINERCMD) buildx build --platform=linux/amd64 packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):amd64 $(if $(LATEST),-t $(REPO):latest,) --cache-from=type=registry,ref=$(REPO):amd64 --cache-to=type=registry,ref=$(REPO):amd64-buildcache --push 
-
-	
-	@touch .container-flag-$(VERSION)
+	$(CONTAINERCMD) build $(EXTRA_OPTS) packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):$(TAG) $(if $(LATEST),-t $(REPO):latest,)
+	touch $@
 
 tc-image: container
 	@cp receptor packaging/tc-image/
@@ -163,4 +161,4 @@ clean:
 	@rm -rfv receptorctl-test-venv/
 	@rm -fv kubectl
 
-.PHONY: lint format fmt pre-commit build-all test clean testloop container container-s390x container-arm64 container-amd64 version receptorctl-tests kubetest receptorctl/.VERSION receptor-python-worker/.VERSION
+.PHONY: lint format fmt pre-commit build-all test clean testloop container version receptorctl-tests kubetest
