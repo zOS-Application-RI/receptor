@@ -3,7 +3,7 @@ name: Receptor CI/CD to Docker Hub
 on:
   push:
     branches: 
-      - 'v*'
+    - 'v*'
   pull_request:
     branches: 
     - main
@@ -98,12 +98,14 @@ jobs:
       #     labels: ${{ steps.meta.outputs.labels }}
       #     cache-from: type=local,src=/tmp/.buildx-cache
       #     cache-to: type=local,dest=/tmp/.buildx-cache
-      - name: Extract branch name
+      - 
+        name: Extract branch name
         shell: bash
         run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
         id: extract_branch
 
-      - name: Build container image
+      - 
+        name: Build container image
         run: |
           make container OFFICIAL_VERSION=yes CONTAINERCMD=docker REPO=docker.io/${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }} VERSION=v1.2.4 LATEST=yes
       -   
@@ -127,7 +129,8 @@ jobs:
       #     username: ${{ secrets.DOCKER_HUB_USERNAME }}
       #     password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
-      - name: Run Snyk to check Docker image for vulnerabilities
+      - 
+        name: Run Snyk to check Docker image for vulnerabilities
         continue-on-error: true
         uses: snyk/actions/docker@master
         env:
@@ -146,8 +149,16 @@ jobs:
       #     # artifacts: "release.tar.gz,foo/*.txt"
       #     # bodyFile: "body.md"
       #     token: ${{ secrets.GITHUB_TOKEN }}          
+      -
+        name: Create and push manifest images
+        uses: Noelware/docker-manifest-action@master # or use whatever version.
+        with:
+              base-image: ${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }}
+              extra-images: ${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }}:arm64, ${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }}:s390x, ${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }}:amd64
+              push: true
 
-      - name: Create draft release
+      - 
+        name: Create draft release
         run: |
           ansible-playbook tools/ansible/stage.yml \
             -e version=${{ github.event.inputs.version }} \
