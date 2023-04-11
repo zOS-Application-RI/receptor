@@ -78,8 +78,9 @@ func TestWebsocketExternalInterop(t *testing.T) {
 		t.Fatalf("Error listening for TCP: %s", err)
 	}
 	server := &http.Server{
-		Addr:    li.Addr().String(),
-		Handler: mux,
+		Addr:              li.Addr().String(),
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
 		TLSConfig: &tls.Config{
 			Certificates:             []tls.Certificate{tlsCert},
 			MinVersion:               tls.VersionTLS12,
@@ -103,7 +104,7 @@ func TestWebsocketExternalInterop(t *testing.T) {
 		MinVersion:       tls.VersionTLS12,
 		CurvePreferences: []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
 	}
-	b2, err := NewWebsocketDialer("wss://"+li.Addr().String(), tls2, "X-Extra-Data: SomeData", true)
+	b2, err := NewWebsocketDialer("wss://"+li.Addr().String(), tls2, "X-Extra-Data: SomeData", true, n1.Logger)
 	if err != nil {
 		t.Fatal(err)
 	}

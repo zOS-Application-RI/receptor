@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"os"
 	"strings"
@@ -11,7 +12,6 @@ import (
 	_ "github.com/ansible/receptor/pkg/backends"
 	_ "github.com/ansible/receptor/pkg/certificates"
 	"github.com/ansible/receptor/pkg/controlsvc"
-	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
 	_ "github.com/ansible/receptor/pkg/services"
 	"github.com/ansible/receptor/pkg/workceptor"
@@ -101,6 +101,14 @@ func (cfg nullBackendCfg) Run() error {
 	return nil
 }
 
+func (cfg *nullBackendCfg) GetAddr() string {
+	return ""
+}
+
+func (cfg *nullBackendCfg) GetTLS() *tls.Config {
+	return nil
+}
+
 func (cfg nullBackendCfg) Reload() error {
 	return cfg.Run()
 }
@@ -164,12 +172,12 @@ func main() {
 	}
 
 	if netceptor.MainInstance.BackendCount() == 0 {
-		logger.Warning("Nothing to do - no backends are running.\n")
+		netceptor.MainInstance.Logger.Warning("Nothing to do - no backends are running.\n")
 		fmt.Printf("Run %s --help for command line instructions.\n", os.Args[0])
 		os.Exit(1)
 	}
 
-	logger.Info("Initialization complete\n")
+	netceptor.MainInstance.Logger.Info("Initialization complete\n")
 
 	<-netceptor.MainInstance.NetceptorDone()
 }

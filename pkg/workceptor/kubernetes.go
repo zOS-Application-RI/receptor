@@ -4,18 +4,18 @@
 package workceptor
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ghjm/cmdline"
 	"github.com/google/shlex"
 	corev1 "k8s.io/api/core/v1"
@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
 	watch2 "k8s.io/client-go/tools/watch"
+	"k8s.io/client-go/util/flowcontrol"
 )
 
 // kubeUnit implements the WorkUnit interface.
@@ -195,15 +197,19 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 		}
 		pod.Spec.Containers[0].Env = evs
 	}
+
+	// get pod and store to kw.pod
 	kw.pod, err = kw.clientset.CoreV1().Pods(ked.KubeNamespace).Create(kw.ctx, pod, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
+
 	select {
 	case <-kw.ctx.Done():
 		return fmt.Errorf("cancelled")
 	default:
 	}
+
 	kw.UpdateFullStatus(func(status *StatusFileData) {
 		status.State = WorkStatePending
 		status.Detail = "Pod created"
@@ -230,26 +236,31 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 	if kw.podPendingTimeout != time.Duration(0) {
 		ctxPodReady, _ = context.WithTimeout(kw.ctx, kw.podPendingTimeout)
 	}
+
 	ev, err := watch2.UntilWithSync(ctxPodReady, lw, &corev1.Pod{}, nil, podRunningAndReady())
 	if ev == nil || ev.Object == nil {
 		return fmt.Errorf("did not return an event while watching pod for work unit %s", kw.ID())
 	}
+
 	var ok bool
 	kw.pod, ok = ev.Object.(*corev1.Pod)
 	if !ok {
 		return fmt.Errorf("watch did not return a pod")
 	}
+
 	if err == ErrPodCompleted {
+		// Hao: shouldn't we also call kw.Cancel() in these cases?
 		if len(kw.pod.Status.ContainerStatuses) != 1 {
 			return fmt.Errorf("expected 1 container in pod but there were %d", len(kw.pod.Status.ContainerStatuses))
 		}
+
 		cstat := kw.pod.Status.ContainerStatuses[0]
 		if cstat.State.Terminated != nil && cstat.State.Terminated.ExitCode != 0 {
 			return fmt.Errorf("container failed with exit code %d: %s", cstat.State.Terminated.ExitCode, cstat.State.Terminated.Message)
 		}
 
 		return err
-	} else if err != nil {
+	} else if err != nil { // any other error besides ErrPodCompleted
 		kw.Cancel()
 		if len(kw.pod.Status.ContainerStatuses) == 1 {
 			if kw.pod.Status.ContainerStatuses[0].State.Waiting != nil {
@@ -264,171 +275,520 @@ func (kw *kubeUnit) createPod(env map[string]string) error {
 }
 
 func (kw *kubeUnit) runWorkUsingLogger() {
-	skipStdin := false
+	skipStdin := true
+
 	status := kw.Status()
 	ked := status.ExtraData.(*kubeExtraData)
-	var err error
-	var errMsg string
-	if ked.PodName == "" {
-		// Create the pod
-		err := kw.createPod(nil)
-		if err == ErrPodCompleted {
-			skipStdin = true
-		} else if err != nil {
-			errMsg = fmt.Sprintf("Error creating pod: %s", err)
+
+	podName := ked.PodName
+	podNamespace := ked.KubeNamespace
+
+	if podName == "" {
+		// create new pod if ked.PodName is empty
+		if err := kw.createPod(nil); err != nil {
+			if err != ErrPodCompleted {
+				errMsg := fmt.Sprintf("Error creating pod: %s", err)
+				kw.Error(errMsg)
+				kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+
+				return
+			}
+		} else {
+			// for newly created pod we need to streaming stdin
+			skipStdin = false
 		}
+
+		podName = kw.pod.Name
+		podNamespace = kw.pod.Namespace
 	} else {
-		skipStdin = true
-		kw.pod, err = kw.clientset.CoreV1().Pods(ked.KubeNamespace).Get(kw.ctx, ked.PodName, metav1.GetOptions{})
-		if err != nil {
-			errMsg = fmt.Sprintf("Error getting pod: %s", err)
-		}
-	}
-	if errMsg != "" {
-		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
-		logger.Error(errMsg)
-
-		return
-	}
-
-	// Open the pod log for stdout
-	logreq := kw.clientset.CoreV1().Pods(kw.pod.ObjectMeta.Namespace).GetLogs(kw.pod.Name, &corev1.PodLogOptions{
-		Container: "worker",
-		Follow:    true,
-	})
-	logStream, err := logreq.Stream(kw.ctx)
-	if err != nil {
-		errMsg := fmt.Sprintf("Error opening pod stream: %s", err)
-		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
-		logger.Error(errMsg)
-
-		return
-	}
-	defer logStream.Close()
-
-	// Attach stdin stream to the pod
-	var exec remotecommand.Executor
-	if !skipStdin {
-		req := kw.clientset.CoreV1().RESTClient().Post().
-			Resource("pods").
-			Name(kw.pod.Name).
-			Namespace(kw.pod.Namespace).
-			SubResource("attach")
-		req.VersionedParams(&corev1.PodExecOptions{
-			Container: "worker",
-			Stdin:     true,
-			Stdout:    false,
-			Stderr:    false,
-			TTY:       false,
-		}, scheme.ParameterCodec)
-		exec, err = remotecommand.NewSPDYExecutor(kw.config, "POST", req.URL())
-		if err != nil {
-			kw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Error attaching to pod: %s", err), 0)
+		if podNamespace == "" {
+			errMsg := fmt.Sprintf("Error creating pod: pod namespace is empty for pod %s",
+				podName,
+			)
+			kw.Error(errMsg)
+			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 
 			return
 		}
-	}
 
-	// Check if we were cancelled before starting the streams
-	select {
-	case <-kw.ctx.Done():
-		kw.UpdateBasicStatus(WorkStateFailed, "Cancelled", 0)
-
-		return
-	default:
-	}
-	// Open stdin reader
-	var stdin *stdinReader
-	if !skipStdin {
-		stdin, err = newStdinReader(kw.UnitDir())
-		if errors.Is(err, errFileSizeZero) {
-			skipStdin = true
-		} else if err != nil {
-			errMsg := fmt.Sprintf("Error opening stdin file: %s", err)
-			logger.Error(errMsg)
+		// resuming from a previously created pod
+		var err error
+		for retries := 5; retries > 0; retries-- {
+			kw.pod, err = kw.clientset.CoreV1().Pods(podNamespace).Get(kw.ctx, podName, metav1.GetOptions{})
+			if err == nil {
+				break
+			} else {
+				kw.Warning(
+					"Error getting pod %s/%s. Will retry %d more times. Retrying: %s",
+					podNamespace,
+					podName,
+					retries,
+					err,
+				)
+				time.Sleep(200 * time.Millisecond)
+			}
+		}
+		if err != nil {
+			errMsg := fmt.Sprintf("Error getting pod %s/%s. Error: %s", podNamespace, podName, err)
+			kw.Error(errMsg)
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 
 			return
 		}
 	}
 
-	// Open stdout writer
+	// Attach stdin stream to the pod
+	var exec remotecommand.Executor
+	if !skipStdin {
+		req := kw.clientset.CoreV1().RESTClient().Post().
+			Resource("pods").
+			Name(podName).
+			Namespace(podNamespace).
+			SubResource("attach")
+
+		req.VersionedParams(
+			&corev1.PodExecOptions{
+				Container: "worker",
+				Stdin:     true,
+				Stdout:    false,
+				Stderr:    false,
+				TTY:       false,
+			},
+			scheme.ParameterCodec,
+		)
+
+		var err error
+		exec, err = remotecommand.NewSPDYExecutor(kw.config, "POST", req.URL())
+		if err != nil {
+			errMsg := fmt.Sprintf("Error creating SPDY executor: %s", err)
+			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+
+			return
+		}
+	}
+
+	var stdinErr error
+	var stdoutErr error
+
+	// finishedChan signal the stdin and stdout monitoring goroutine to stop
+	finishedChan := make(chan struct{})
+
+	// this will signal the stdin and stdout monitoring goroutine to stop when this function returns
+	defer close(finishedChan)
+
+	stdinErrChan := make(chan struct{}) // signal that stdin goroutine have errored and stop stdout goroutine
+
+	// open stdin reader that reads from the work unit's data directory
+	var stdin *stdinReader
+	if !skipStdin {
+		var err error
+		stdin, err = newStdinReader(kw.UnitDir())
+		if err != nil {
+			if errors.Is(err, errFileSizeZero) {
+				skipStdin = true
+			} else {
+				errMsg := fmt.Sprintf("Error opening stdin file: %s", err)
+				kw.Error(errMsg)
+				kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+
+				return
+			}
+		} else {
+			// goroutine to cancel stdin reader
+			go func() {
+				select {
+				case <-kw.ctx.Done():
+					stdin.reader.Close()
+
+					return
+				case <-finishedChan:
+				case <-stdin.Done():
+					return
+				}
+			}()
+		}
+	}
+
+	// open stdout writer that writes to work unit's data directory
 	stdout, err := newStdoutWriter(kw.UnitDir())
 	if err != nil {
 		errMsg := fmt.Sprintf("Error opening stdout file: %s", err)
-		logger.Error(errMsg)
+		kw.Error(errMsg)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 
 		return
 	}
 
-	// Goroutine to update status when stdin is fully sent to the pod, which is when we
-	// update from WorkStatePending to WorkStateRunning.
-	finishedChan := make(chan struct{})
-	if !skipStdin {
-		kw.UpdateFullStatus(func(status *StatusFileData) {
-			status.State = WorkStatePending
-			status.Detail = "Sending stdin to pod"
-		})
+	// goroutine to cancel stdout stream
+	go func() {
+		select {
+		case <-kw.ctx.Done():
+			stdout.writer.Close()
+
+			return
+		case <-stdinErrChan:
+			stdout.writer.Close()
+
+			return
+		case <-finishedChan:
+			return
+		}
+	}()
+
+	streamWait := sync.WaitGroup{}
+	streamWait.Add(2)
+
+	if skipStdin {
+		kw.UpdateBasicStatus(WorkStateRunning, "Pod Running", stdout.Size())
+		streamWait.Done()
+	} else {
 		go func() {
-			select {
-			case <-kw.ctx.Done():
-				return
-			case <-finishedChan:
-				return
-			case <-stdin.Done():
-				err := stdin.Error()
-				if err == io.EOF {
+			defer streamWait.Done()
+
+			kw.UpdateFullStatus(func(status *StatusFileData) {
+				status.State = WorkStatePending
+				status.Detail = "Sending stdin to pod"
+			})
+
+			var err error
+			for retries := 5; retries > 0; retries-- {
+				err = exec.Stream(remotecommand.StreamOptions{
+					Stdin: stdin,
+					Tty:   false,
+				})
+				if err != nil {
+					// NOTE: io.EOF for stdin is handled by remotecommand and will not trigger this
+					kw.Warning(
+						"Error streaming stdin to pod %s/%s. Will retry %d more times. Error: %s",
+						podNamespace,
+						podName,
+						retries,
+						err,
+					)
+					time.Sleep(200 * time.Millisecond)
+				} else {
+					break
+				}
+			}
+
+			if err != nil {
+				stdinErr = err
+				errMsg := fmt.Sprintf(
+					"Error streaming stdin to pod %s/%s. Error: %s",
+					podNamespace,
+					podName,
+					err,
+				)
+				kw.Error(errMsg)
+				kw.UpdateBasicStatus(WorkStateFailed, errMsg, stdout.Size())
+
+				close(stdinErrChan) // signal STDOUT goroutine to stop
+			} else {
+				if stdin.Error() == io.EOF {
 					kw.UpdateBasicStatus(WorkStateRunning, "Pod Running", stdout.Size())
 				} else {
-					kw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Error reading stdin: %s", err), stdout.Size())
+					// this is probably not possible...
+					errMsg := fmt.Sprintf("Error reading stdin: %s", stdin.Error())
+					kw.Error(errMsg)
+					kw.UpdateBasicStatus(WorkStateFailed, errMsg, stdout.Size())
+
+					close(stdinErrChan) // signal STDOUT goroutine to stop
 				}
 			}
 		}()
-	} else {
-		kw.UpdateBasicStatus(WorkStateRunning, "Pod Running", stdout.Size())
 	}
 
-	// Actually run the streams.  This blocks until the pod finishes.
-	var errStdin error
-	var errStdout error
-	streamWait := sync.WaitGroup{}
-	streamWait.Add(2)
-	if skipStdin {
-		streamWait.Done()
-	} else {
-		go func() {
-			errStdin = exec.Stream(remotecommand.StreamOptions{
-				Stdin: stdin,
-				Tty:   false,
-			})
-			if errStdin != nil {
-				logStream.Close()
+	noReconnect := func() {
+		// Legacy method, for use on k8s < v1.23.14
+		// uses io.Copy to stream data from pod to stdout file
+		// known issues around this, as logstream can terminate due to log rotation
+		// or 4 hr timeout
+		defer streamWait.Done()
+		var logStream io.ReadCloser
+		logReq := kw.clientset.CoreV1().Pods(podNamespace).GetLogs(
+			podName, &corev1.PodLogOptions{
+				Container: "worker",
+				Follow:    true,
+			},
+		)
+		// get logstream, with retry
+		for retries := 5; retries > 0; retries-- {
+			logStream, err = logReq.Stream(kw.ctx)
+			if err == nil {
+				break
+			} else {
+				kw.Warning(
+					"Error opening log stream for pod %s/%s. Will retry %d more times. Error: %s",
+					podNamespace,
+					podName,
+					retries,
+					err,
+				)
+				time.Sleep(time.Second)
 			}
-			streamWait.Done()
-		}()
+		}
+		if err != nil {
+			errMsg := fmt.Sprintf("Error opening log stream for pod %s/%s. Error: %s", podNamespace, podName, err)
+			kw.Error(errMsg)
+			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+
+			return
+		}
+
+		_, stdoutErr = io.Copy(stdout, logStream)
+		if stdoutErr != nil {
+			kw.Error(
+				"Error streaming pod logs to stdout for pod %s/%s. Error: %s",
+				podNamespace,
+				podName,
+				stdoutErr,
+			)
+		}
 	}
-	go func() {
-		_, errStdout = io.Copy(stdout, logStream)
-		streamWait.Done()
-	}()
+
+	withReconnect := func() {
+		// preferred method for k8s >= 1.23.14
+		defer streamWait.Done()
+		var sinceTime time.Time
+		var logStream io.ReadCloser
+		eofRetries := 5
+		successfulWrite := false
+		remainingEOFAttempts := eofRetries // resets on each successful read from pod stdout
+
+		for {
+			if stdinErr != nil {
+				break
+			}
+
+			// get pod, with retry
+			for retries := 5; retries > 0; retries-- {
+				kw.pod, err = kw.clientset.CoreV1().Pods(podNamespace).Get(kw.ctx, podName, metav1.GetOptions{})
+				if err == nil {
+					break
+				} else {
+					kw.Warning(
+						"Error getting pod %s/%s. Will retry %d more times. Error: %s",
+						podNamespace,
+						podName,
+						retries,
+						err,
+					)
+					time.Sleep(time.Second)
+				}
+			}
+			if err != nil {
+				errMsg := fmt.Sprintf("Error getting pod %s/%s. Error: %s", podNamespace, podName, err)
+				kw.Error(errMsg)
+				kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+
+				break
+			}
+
+			logReq := kw.clientset.CoreV1().Pods(podNamespace).GetLogs(
+				podName, &corev1.PodLogOptions{
+					Container:  "worker",
+					Follow:     true,
+					Timestamps: true,
+					SinceTime:  &metav1.Time{Time: sinceTime},
+				},
+			)
+			// get logstream, with retry
+			for retries := 5; retries > 0; retries-- {
+				logStream, err = logReq.Stream(kw.ctx)
+				if err == nil {
+					break
+				} else {
+					kw.Warning(
+						"Error opening log stream for pod %s/%s. Will retry %d more times. Error: %s",
+						podNamespace,
+						podName,
+						retries,
+						err,
+					)
+					time.Sleep(time.Second)
+				}
+			}
+			if err != nil {
+				errMsg := fmt.Sprintf(
+					"Error opening log stream for pod %s/%s. Error: %s",
+					podNamespace,
+					podName,
+					err,
+				)
+				kw.Error(errMsg)
+				kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
+
+				break
+			}
+
+			// read from logstream
+			streamReader := bufio.NewReader(logStream)
+			for stdinErr == nil { // check between every line read to see if we need to stop reading
+				line, err := streamReader.ReadString('\n')
+				if err == io.EOF {
+					kw.Debug(
+						"Detected EOF for pod %s/%s. Will retry %d more times. Error: %s",
+						podNamespace,
+						podName,
+						remainingEOFAttempts,
+						err,
+					)
+					successfulWrite = false
+					remainingEOFAttempts--
+					if remainingEOFAttempts > 0 {
+						time.Sleep(200 * time.Millisecond)
+
+						break
+					}
+
+					return
+				}
+				if err != nil {
+					stdoutErr = err
+					kw.Error("Error reading from pod %s/%s: %s", podNamespace, podName, err)
+
+					return
+				}
+
+				split := strings.SplitN(line, " ", 2)
+				timeStamp := parseTime(split[0])
+				if !timeStamp.After(sinceTime) && !successfulWrite {
+					continue
+				}
+				msg := split[1]
+
+				_, err = stdout.Write([]byte(msg))
+				if err != nil {
+					stdoutErr = fmt.Errorf("writing to stdout: %s", err)
+					kw.Error("Error writing to stdout: %s", err)
+
+					return
+				}
+				remainingEOFAttempts = eofRetries // each time we read successfully, reset this counter
+				sinceTime = *timeStamp
+				successfulWrite = true
+			}
+
+			logStream.Close()
+		}
+	}
+
+	stdoutWithReconnect := shouldUseReconnect(kw)
+	if stdoutWithReconnect && stdoutErr == nil {
+		kw.Debug("streaming stdout with reconnect support")
+		go withReconnect()
+	} else {
+		kw.Debug("streaming stdout with no reconnect support")
+		go noReconnect()
+	}
+
 	streamWait.Wait()
-	close(finishedChan)
-	if errStdin != nil || errStdout != nil {
+
+	if stdinErr != nil || stdoutErr != nil {
 		var errDetail string
 		switch {
-		case errStdin == nil:
-			errDetail = fmt.Sprintf("%s", errStdout)
-		case errStdout == nil:
-			errDetail = fmt.Sprintf("%s", errStdin)
+		case stdinErr == nil:
+			errDetail = fmt.Sprintf("%s", stdoutErr)
+		case stdoutErr == nil:
+			errDetail = fmt.Sprintf("%s", stdinErr)
 		default:
-			errDetail = fmt.Sprintf("stdin: %s, stdout: %s", errStdin, errStdout)
+			errDetail = fmt.Sprintf("stdin: %s, stdout: %s", stdinErr, stdoutErr)
 		}
 		kw.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Stream error running pod: %s", errDetail), stdout.Size())
 
 		return
 	}
 	kw.UpdateBasicStatus(WorkStateSucceeded, "Finished", stdout.Size())
+}
+
+func isCompatibleK8S(kw *kubeUnit, versionStr string) bool {
+	semver, err := version.ParseSemantic(versionStr)
+	if err != nil {
+		kw.w.nc.Logger.Warning("could parse Kubernetes server version %s, will not use reconnect support", versionStr)
+
+		return false
+	}
+
+	// ignore pre-release in version comparison
+	semver = semver.WithPreRelease("")
+
+	// The patch was backported to minor version 23, 24 and 25. We must check z stream
+	// based on the minor version
+	// if minor version == 24, compare with v1.24.8
+	// if minor version == 25, compare with v1.25.4
+	// all other minor versions compare with v1.23.14
+	var compatibleVer string
+	switch semver.Minor() {
+	case 24:
+		compatibleVer = "v1.24.8"
+	case 25:
+		compatibleVer = "v1.25.4"
+	default:
+		compatibleVer = "v1.23.14"
+	}
+
+	if semver.AtLeast(version.MustParseSemantic(compatibleVer)) {
+		kw.w.nc.Logger.Debug("Kubernetes version %s is at least %s, using reconnect support", semver, compatibleVer)
+
+		return true
+	}
+	kw.w.nc.Logger.Debug("Kubernetes version %s not at least %s, not using reconnect support", semver, compatibleVer)
+
+	return false
+}
+
+func shouldUseReconnect(kw *kubeUnit) bool {
+	// Attempt to detect support for streaming from pod with timestamps based on
+	// Kubernetes server version
+	// In order to use reconnect method, Kubernetes server must be at least
+	//   v1.23.14
+	//   v1.24.8
+	//   v1.25.4
+	// These versions contain a critical patch that permits connecting to the
+	// logstream with timestamps enabled.
+	// Without the patch, stdout lines would be split after 4K characters into a
+	// new line, which will cause issues in Receptor.
+	// https://github.com/kubernetes/kubernetes/issues/77603
+	// Can override the detection by setting the RECEPTOR_KUBE_SUPPORT_RECONNECT
+	// accepted values: "enabled", "disabled", "auto" with "disabled" being the default
+	// all invalid value will assume to be "disabled"
+
+	env, ok := os.LookupEnv("RECEPTOR_KUBE_SUPPORT_RECONNECT")
+	if ok {
+		switch env {
+		case "enabled":
+			return true
+		case "disabled":
+			return false
+		case "auto":
+			// continue
+		default:
+			return false
+		}
+	}
+
+	serverVerInfo, err := kw.clientset.ServerVersion()
+	if err != nil {
+		kw.w.nc.Logger.Warning("could not detect Kubernetes server version, will not use reconnect support")
+
+		return false
+	}
+
+	return isCompatibleK8S(kw, serverVerInfo.String())
+}
+
+func parseTime(s string) *time.Time {
+	t, err := time.Parse(time.RFC3339, s)
+	if err == nil {
+		return &t
+	}
+
+	t, err = time.Parse(time.RFC3339Nano, s)
+	if err == nil {
+		return &t
+	}
+
+	return nil
 }
 
 func getDefaultInterface() (string, error) {
@@ -479,7 +839,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 	if err != nil {
 		errMsg := fmt.Sprintf("Error listening: %s", err)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
-		logger.Error(errMsg)
+		kw.w.nc.Logger.Error(errMsg)
 
 		return
 	}
@@ -503,7 +863,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 		if err != nil {
 			errMsg := fmt.Sprintf("Error accepting: %s", err)
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
-			logger.Error(errMsg)
+			kw.w.nc.Logger.Error(errMsg)
 			cancel()
 
 			return
@@ -516,7 +876,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 	if err != nil {
 		errMsg := fmt.Sprintf("Error creating pod: %s", err)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
-		logger.Error(errMsg)
+		kw.w.nc.Logger.Error(errMsg)
 		cancel()
 
 		return
@@ -535,7 +895,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 	stdin, err = newStdinReader(kw.UnitDir())
 	if err != nil {
 		errMsg := fmt.Sprintf("Error opening stdin file: %s", err)
-		logger.Error(errMsg)
+		kw.w.nc.Logger.Error(errMsg)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 		cancel()
 
@@ -546,7 +906,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 	stdout, err := newStdoutWriter(kw.UnitDir())
 	if err != nil {
 		errMsg := fmt.Sprintf("Error opening stdout file: %s", err)
-		logger.Error(errMsg)
+		kw.w.nc.Logger.Error(errMsg)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 		cancel()
 
@@ -564,7 +924,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 		_ = conn.CloseWrite()
 		if err != nil {
 			errMsg := fmt.Sprintf("Error sending stdin to pod: %s", err)
-			logger.Error(errMsg)
+			kw.w.nc.Logger.Error(errMsg)
 			kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 			cancel()
 
@@ -596,7 +956,7 @@ func (kw *kubeUnit) runWorkUsingTCP() {
 	}
 	if err != nil {
 		errMsg := fmt.Sprintf("Error reading stdout from pod: %s", err)
-		logger.Error(errMsg)
+		kw.w.nc.Logger.Error(errMsg)
 		kw.UpdateBasicStatus(WorkStateFailed, errMsg, 0)
 		cancel()
 
@@ -677,6 +1037,57 @@ func (kw *kubeUnit) connectToKube() error {
 	if err != nil {
 		return err
 	}
+
+	kw.config.QPS = float32(100)
+	kw.config.Burst = 1000
+
+	// RECEPTOR_KUBE_CLIENTSET_QPS
+	// default: 100
+	envQPS, ok := os.LookupEnv("RECEPTOR_KUBE_CLIENTSET_QPS")
+	if ok {
+		qps, err := strconv.Atoi(envQPS)
+		if err != nil {
+			// ignore error, use default
+			kw.Warning("Invalid value for RECEPTOR_KUBE_CLIENTSET_QPS: %s. Ignoring", envQPS)
+		} else {
+			kw.config.QPS = float32(qps)
+			kw.config.Burst = qps * 10
+		}
+	}
+
+	kw.Debug("RECEPTOR_KUBE_CLIENTSET_QPS: %s", envQPS)
+
+	// RECEPTOR_KUBE_CLIENTSET_BURST
+	// default: 10 x QPS
+	envBurst, ok := os.LookupEnv("RECEPTOR_KUBE_CLIENTSET_BURST")
+	if ok {
+		burst, err := strconv.Atoi(envBurst)
+		if err != nil {
+			kw.Warning("Invalid value for RECEPTOR_KUBE_CLIENTSET_BURST: %s. Ignoring", envQPS)
+		} else {
+			kw.config.Burst = burst
+		}
+	}
+
+	kw.Debug("RECEPTOR_KUBE_CLIENTSET_BURST: %s", envBurst)
+
+	kw.Debug("Initializing Kubernetes clientset")
+	// RECEPTOR_KUBE_CLIENTSET_RATE_LIMITER
+	// default: tokenbucket
+	// options: never, always, tokenbucket
+	envRateLimiter, ok := os.LookupEnv("RECEPTOR_KUBE_CLIENTSET_RATE_LIMITER")
+	if ok {
+		switch envRateLimiter {
+		case "never":
+			kw.config.RateLimiter = flowcontrol.NewFakeNeverRateLimiter()
+		case "always":
+			kw.config.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
+		default:
+		}
+		kw.Debug("RateLimiter: %s", envRateLimiter)
+	}
+
+	kw.Debug("QPS: %f, Burst: %d", kw.config.QPS, kw.config.Burst)
 	kw.clientset, err = kubernetes.NewForConfig(kw.config)
 	if err != nil {
 		return err
@@ -690,7 +1101,7 @@ func readFileToString(filename string) (string, error) {
 	if filename == "" {
 		return "", nil
 	}
-	content, err := ioutil.ReadFile(filename)
+	content, err := os.ReadFile(filename)
 	if err != nil {
 		return "", err
 	}
@@ -761,7 +1172,7 @@ func (kw *kubeUnit) SetFromParams(params map[string]string) error {
 	if podPendingTimeoutString != "" {
 		podPendingTimeout, err := time.ParseDuration(podPendingTimeoutString)
 		if err != nil {
-			logger.Error("Failed to parse pod_pending_timeout -- valid examples include '1.5h', '30m', '30m10s'")
+			kw.w.nc.Logger.Error("Failed to parse pod_pending_timeout -- valid examples include '1.5h', '30m', '30m10s'")
 
 			return err
 		}
@@ -844,11 +1255,11 @@ func (kw *kubeUnit) Restart() error {
 	if kw.deletePodOnRestart {
 		err := kw.connectToKube()
 		if err != nil {
-			logger.Warning("Pod %s could not be deleted: %s", ked.PodName, err.Error())
+			kw.w.nc.Logger.Warning("Pod %s could not be deleted: %s", ked.PodName, err.Error())
 		} else {
 			err := kw.clientset.CoreV1().Pods(ked.KubeNamespace).Delete(context.Background(), ked.PodName, metav1.DeleteOptions{})
 			if err != nil {
-				logger.Warning("Pod %s could not be deleted: %s", ked.PodName, err.Error())
+				kw.w.nc.Logger.Warning("Pod %s could not be deleted: %s", ked.PodName, err.Error())
 			}
 		}
 	}
@@ -872,7 +1283,7 @@ func (kw *kubeUnit) Cancel() error {
 	if kw.pod != nil {
 		err := kw.clientset.CoreV1().Pods(kw.pod.Namespace).Delete(context.Background(), kw.pod.Name, metav1.DeleteOptions{})
 		if err != nil {
-			logger.Error("Error deleting pod %s: %s", kw.pod.Name, err)
+			kw.w.nc.Logger.Error("Error deleting pod %s: %s", kw.pod.Name, err)
 		}
 	}
 	if kw.cancel != nil {

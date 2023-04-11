@@ -125,6 +125,8 @@ class ReceptorControl:
                                 purpose=ssl.Purpose.SERVER_AUTH,
                                 cafile=self._rootcas,
                             )
+                            context.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
+
                             if self._key and self._cert:
                                 context.load_cert_chain(
                                     certfile=self._cert, keyfile=self._key
@@ -243,9 +245,11 @@ class ReceptorControl:
         result = json.loads(text)
         return result
 
-    def get_work_results(self, unit_id, return_socket=False, return_sockfile=True):
+    def get_work_results(
+        self, unit_id, startpos=0, return_socket=False, return_sockfile=True
+    ):
         self.connect()
-        self.writestr(f"work results {unit_id}\n")
+        self.writestr(f"work results {unit_id} {startpos}\n")
         text = self.readstr()
         m = re.compile("Streaming results for work unit (.+)").fullmatch(text)
         if not m:
@@ -265,7 +269,7 @@ class ReceptorControl:
             if not return_socket:
                 self._socket.close()
             if not return_sockfile:
-                self.sockfile.close()
+                self._sockfile.close()
         finally:
             self._socket = None
             self._sockfile = None

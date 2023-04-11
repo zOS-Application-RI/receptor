@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -103,7 +102,7 @@ func (m *LibMesh) Nodes() map[string]Node {
 // TCPListen helper function to create and start a TCPListener
 // This might be an unnecessary abstraction and maybe should be deleted.
 func (n *LibNode) TCPListen(address string, cost float64, nodeCost map[string]float64, tlsCfg *tls.Config) error {
-	b1, err := backends.NewTCPListener(address, tlsCfg)
+	b1, err := backends.NewTCPListener(address, tlsCfg, n.NetceptorInstance.Logger)
 	if err != nil {
 		return err
 	}
@@ -116,7 +115,7 @@ func (n *LibNode) TCPListen(address string, cost float64, nodeCost map[string]fl
 // TCPDial helper function to create and start a TCPDialer
 // This might be an unnecessary abstraction and maybe should be deleted.
 func (n *LibNode) TCPDial(address string, cost float64, tlsCfg *tls.Config) error {
-	b1, err := backends.NewTCPDialer(address, true, tlsCfg)
+	b1, err := backends.NewTCPDialer(address, true, tlsCfg, n.NetceptorInstance.Logger)
 	if err != nil {
 		return err
 	}
@@ -128,7 +127,7 @@ func (n *LibNode) TCPDial(address string, cost float64, tlsCfg *tls.Config) erro
 // UDPListen helper function to create and start a UDPListener
 // This might be an unnecessary abstraction and maybe should be deleted.
 func (n *LibNode) UDPListen(address string, cost float64, nodeCost map[string]float64) error {
-	b1, err := backends.NewUDPListener(address)
+	b1, err := backends.NewUDPListener(address, n.NetceptorInstance.Logger)
 	if err != nil {
 		return err
 	}
@@ -141,7 +140,7 @@ func (n *LibNode) UDPListen(address string, cost float64, nodeCost map[string]fl
 // UDPDial helper function to create and start a UDPDialer
 // This might be an unnecessary abstraction and maybe should be deleted.
 func (n *LibNode) UDPDial(address string, cost float64) error {
-	b1, err := backends.NewUDPDialer(address, true)
+	b1, err := backends.NewUDPDialer(address, true, n.NetceptorInstance.Logger)
 	if err != nil {
 		return err
 	}
@@ -154,7 +153,7 @@ func (n *LibNode) UDPDial(address string, cost float64) error {
 // This might be an unnecessary abstraction and maybe should be deleted.
 func (n *LibNode) WebsocketListen(address string, cost float64, nodeCost map[string]float64, tlsCfg *tls.Config) error {
 	// TODO: Add support for TLS
-	b1, err := backends.NewWebsocketListener(address, tlsCfg)
+	b1, err := backends.NewWebsocketListener(address, tlsCfg, n.NetceptorInstance.Logger)
 	if err != nil {
 		return err
 	}
@@ -168,7 +167,7 @@ func (n *LibNode) WebsocketListen(address string, cost float64, nodeCost map[str
 // This might be an unnecessary abstraction and maybe should be deleted.
 func (n *LibNode) WebsocketDial(address string, cost float64, tlsCfg *tls.Config) error {
 	// TODO: Add support for TLS and extra headers
-	b1, err := backends.NewWebsocketDialer(address, nil, "", true)
+	b1, err := backends.NewWebsocketDialer(address, nil, "", true, n.NetceptorInstance.Logger)
 	if err != nil {
 		return err
 	}
@@ -185,7 +184,7 @@ func (m *LibMesh) Dir() string {
 // NewLibMeshFromFile Takes a filename of a file with a yaml description of a mesh, loads it and
 // calls NewMeshFromYaml on it.
 func NewLibMeshFromFile(filename, dirSuffix string) (Mesh, error) {
-	yamlDat, err := ioutil.ReadFile(filename)
+	yamlDat, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +213,7 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 	if err != nil {
 		return nil, err
 	}
-	tempdir, err := ioutil.TempDir(baseDir, "mesh-")
+	tempdir, err := os.MkdirTemp(baseDir, "mesh-")
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +224,7 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 	// there's something to dial into
 	for k := range meshDefinition.Nodes {
 		node := NewLibNode(k)
-		node.dir, err = ioutil.TempDir(mesh.dir, k+"-")
+		node.dir, err = os.MkdirTemp(mesh.dir, k+"-")
 		if err != nil {
 			return nil, err
 		}
@@ -245,11 +244,11 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 						if vMap["cert"] == "" || vMap["key"] == "" {
 							return nil, fmt.Errorf("cert and key must both be supplied or neither")
 						}
-						certbytes, err := ioutil.ReadFile(vMap["cert"].(string))
+						certbytes, err := os.ReadFile(vMap["cert"].(string))
 						if err != nil {
 							return nil, err
 						}
-						keybytes, err := ioutil.ReadFile(vMap["key"].(string))
+						keybytes, err := os.ReadFile(vMap["key"].(string))
 						if err != nil {
 							return nil, err
 						}
@@ -261,7 +260,7 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 					}
 
 					if vMap["rootcas"] != "" {
-						bytes, err := ioutil.ReadFile(vMap["rootcas"].(string))
+						bytes, err := os.ReadFile(vMap["rootcas"].(string))
 						if err != nil {
 							return nil, fmt.Errorf("error reading root CAs file: %s", err)
 						}
@@ -282,11 +281,11 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 						PreferServerCipherSuites: true,
 					}
 
-					certbytes, err := ioutil.ReadFile(vMap["cert"].(string))
+					certbytes, err := os.ReadFile(vMap["cert"].(string))
 					if err != nil {
 						return nil, err
 					}
-					keybytes, err := ioutil.ReadFile(vMap["key"].(string))
+					keybytes, err := os.ReadFile(vMap["key"].(string))
 					if err != nil {
 						return nil, err
 					}
@@ -298,7 +297,7 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 					tlscfg.Certificates = []tls.Certificate{cert}
 
 					if vMap["clientcas"] != nil {
-						bytes, err := ioutil.ReadFile(vMap["clientcas"].(string))
+						bytes, err := os.ReadFile(vMap["clientcas"].(string))
 						if err != nil {
 							return nil, fmt.Errorf("error reading client CAs file: %s", err)
 						}
@@ -387,7 +386,7 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 						return nil, err
 					}
 					switch backend := node.Backends[len(node.Backends)-1].(type) {
-					case *backends.UDPListener:
+					case *backends.UDPListener: //nolint:typecheck
 						address = backend.LocalAddr().String()
 					case *backends.TCPListener:
 						address = backend.Addr().String()
@@ -490,7 +489,7 @@ func NewLibMeshFromYaml(meshDefinition YamlData, dirSuffix string) (*LibMesh, er
 		ctx, canceller := context.WithCancel(context.Background())
 		node.controlServerCanceller = canceller
 
-		tempdir, err := ioutil.TempDir(utils.ControlSocketBaseDir, "")
+		tempdir, err := os.MkdirTemp(utils.ControlSocketBaseDir, "")
 		if err != nil {
 			return nil, err
 		}
