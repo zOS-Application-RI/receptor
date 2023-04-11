@@ -111,6 +111,9 @@ jobs:
           inputs: docker.io/${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }}:latest
           images: docker.io/${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }}:amd64, docker.io/${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }}:arm64, docker.io/${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }}:s390x
           push: true
+          amend: true
+        
+
       -   
         name : Docker Scan Image
         id: scan
