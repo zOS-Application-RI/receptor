@@ -143,9 +143,9 @@ container: .container-flag-$(VERSION)
 	BUILDKIT_MULTI_PLATFORM=1 $(CONTAINERCMD) buildx build --platform=linux/arm64 packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):arm64 $(if $(LATEST),-t $(REPO):latest,) --cache-from=type=registry,ref=$(REPO):arm64 --cache-to=type=registry,ref=$(REPO):arm64-buildcache --push
 	BUILDKIT_MULTI_PLATFORM=1 $(CONTAINERCMD) buildx build --platform=linux/s390x packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):s390x $(if $(LATEST),-t $(REPO):latest,) --cache-from=type=registry,ref=$(REPO):s390x --cache-to=type=registry,ref=$(REPO):s390x-buildcache --push 
 	BUILDKIT_MULTI_PLATFORM=1 $(CONTAINERCMD) buildx build --platform=linux/amd64 packaging/container --build-arg VERSION=$(VERSION:v%=%) -t $(REPO):amd64 $(if $(LATEST),-t $(REPO):latest,) --cache-from=type=registry,ref=$(REPO):amd64 --cache-to=type=registry,ref=$(REPO):amd64-buildcache --push 
-    $(CONTAINERCMD) manifest create $(REPO):latest --amend $(REPO):amd64 --amend $(REPO):arm64 --amend $(REPO):s390x
-	$(CONTAINERCMD) manifest push $(REPO):latest
-	
+    # $(CONTAINERCMD) manifest create $(REPO):latest --amend $(REPO):amd64 --amend $(REPO):arm64 --amend $(REPO):s390x
+	# $(CONTAINERCMD) manifest push $(REPO):latest
+
 	@touch .container-flag-$(VERSION)
 
 tc-image: container

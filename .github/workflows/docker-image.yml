@@ -104,6 +104,14 @@ jobs:
       - name: Build container image
         run: |
           make container OFFICIAL_VERSION=yes CONTAINERCMD=docker REPO=docker.io/${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }} VERSION=v1.3.0 LATEST=yes
+      - 
+        name: Docker Manifest GitHub Action
+        uses: Noelware/docker-manifest-action@0.3.1
+        with:
+          inputs: docker.io/${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }}:latest
+          images: docker.io/${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }}:amd64, docker.io/${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }}:arm64, docker.io/${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.event.repository.name }}:s390x
+          push: true
+        
       -   
         name : Docker Scan Image
         id: scan
