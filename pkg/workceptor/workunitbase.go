@@ -8,13 +8,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"sync"
 	"time"
 
-	"github.com/ansible/receptor/pkg/logger"
 	"github.com/fsnotify/fsnotify"
 	"github.com/rogpeppe/go-internal/lockedfile"
 )
@@ -64,16 +62,17 @@ func IsPending(err error) bool {
 
 // BaseWorkUnit includes data common to all work units, and partially implements the WorkUnit interface.
 type BaseWorkUnit struct {
-	w               *Workceptor
-	status          StatusFileData
-	unitID          string
-	unitDir         string
-	statusFileName  string
-	stdoutFileName  string
-	statusLock      *sync.RWMutex
-	lastUpdateError error
-	ctx             context.Context
-	cancel          context.CancelFunc
+	w                   *Workceptor
+	status              StatusFileData
+	unitID              string
+	unitDir             string
+	statusFileName      string
+	stdoutFileName      string
+	statusLock          *sync.RWMutex
+	lastUpdateError     error
+	lastUpdateErrorLock *sync.RWMutex
+	ctx                 context.Context
+	cancel              context.CancelFunc
 }
 
 // Init initializes the basic work unit data, in memory only.
@@ -88,7 +87,32 @@ func (bwu *BaseWorkUnit) Init(w *Workceptor, unitID string, workType string) {
 	bwu.statusFileName = path.Join(bwu.unitDir, "status")
 	bwu.stdoutFileName = path.Join(bwu.unitDir, "stdout")
 	bwu.statusLock = &sync.RWMutex{}
+	bwu.lastUpdateErrorLock = &sync.RWMutex{}
 	bwu.ctx, bwu.cancel = context.WithCancel(w.ctx)
+}
+
+// Error logs message with unitID prepended.
+func (bwu *BaseWorkUnit) Error(format string, v ...interface{}) {
+	format = fmt.Sprintf("[%s] %s", bwu.unitID, format)
+	bwu.w.nc.Logger.Error(format, v...)
+}
+
+// Warning logs message with unitID prepended.
+func (bwu *BaseWorkUnit) Warning(format string, v ...interface{}) {
+	format = fmt.Sprintf("[%s] %s", bwu.unitID, format)
+	bwu.w.nc.Logger.Warning(format, v...)
+}
+
+// Info logs message with unitID prepended.
+func (bwu *BaseWorkUnit) Info(format string, v ...interface{}) {
+	format = fmt.Sprintf("[%s] %s", bwu.unitID, format)
+	bwu.w.nc.Logger.Info(format, v...)
+}
+
+// Debug logs message with unitID prepended.
+func (bwu *BaseWorkUnit) Debug(format string, v ...interface{}) {
+	format = fmt.Sprintf("[%s] %s", bwu.unitID, format)
+	bwu.w.nc.Logger.Debug(format, v...)
 }
 
 // SetFromParams sets the in-memory state from parameters.
@@ -130,7 +154,7 @@ func (sfd *StatusFileData) lockStatusFile(filename string) (*lockedfile.File, er
 // unlockStatusFile releases the lock on the status file.
 func (sfd *StatusFileData) unlockStatusFile(filename string, lockFile *lockedfile.File) {
 	if err := lockFile.Close(); err != nil {
-		logger.Error("Error closing %s.lock: %s", filename, err)
+		MainInstance.nc.Logger.Error("Error closing %s.lock: %s", filename, err)
 	}
 }
 
@@ -177,7 +201,7 @@ func (bwu *BaseWorkUnit) Save() error {
 
 // loadFromFile loads status from an already open file.
 func (sfd *StatusFileData) loadFromFile(file io.Reader) error {
-	jsonBytes, err := ioutil.ReadAll(file)
+	jsonBytes, err := io.ReadAll(file)
 	if err != nil {
 		return err
 	}
@@ -229,7 +253,7 @@ func (sfd *StatusFileData) UpdateFullStatus(filename string, statusFunc func(*St
 	defer func() {
 		err := file.Close()
 		if err != nil {
-			logger.Error("Error closing %s: %s", filename, err)
+			MainInstance.nc.Logger.Error("Error closing %s: %s", filename, err)
 		}
 	}()
 	size, err := file.Seek(0, 2)
@@ -269,9 +293,11 @@ func (bwu *BaseWorkUnit) UpdateFullStatus(statusFunc func(*StatusFileData)) {
 	bwu.statusLock.Lock()
 	defer bwu.statusLock.Unlock()
 	err := bwu.status.UpdateFullStatus(bwu.statusFileName, statusFunc)
+	bwu.lastUpdateErrorLock.Lock()
+	defer bwu.lastUpdateErrorLock.Unlock()
 	bwu.lastUpdateError = err
 	if err != nil {
-		logger.Error("Error updating status file %s: %s.", bwu.statusFileName, err)
+		bwu.w.nc.Logger.Error("Error updating status file %s: %s.", bwu.statusFileName, err)
 	}
 }
 
@@ -293,14 +319,19 @@ func (bwu *BaseWorkUnit) UpdateBasicStatus(state int, detail string, stdoutSize 
 	bwu.statusLock.Lock()
 	defer bwu.statusLock.Unlock()
 	err := bwu.status.UpdateBasicStatus(bwu.statusFileName, state, detail, stdoutSize)
+	bwu.lastUpdateErrorLock.Lock()
+	defer bwu.lastUpdateErrorLock.Unlock()
 	bwu.lastUpdateError = err
 	if err != nil {
-		logger.Error("Error updating status file %s: %s.", bwu.statusFileName, err)
+		bwu.w.nc.Logger.Error("Error updating status file %s: %s.", bwu.statusFileName, err)
 	}
 }
 
 // LastUpdateError returns the last error (including nil) resulting from an UpdateBasicStatus or UpdateFullStatus.
 func (bwu *BaseWorkUnit) LastUpdateError() error {
+	bwu.lastUpdateErrorLock.Lock()
+	defer bwu.lastUpdateErrorLock.Unlock()
+
 	return bwu.lastUpdateError
 }
 
@@ -340,7 +371,7 @@ loop:
 			if event.Op&fsnotify.Write == fsnotify.Write {
 				err = bwu.Load()
 				if err != nil {
-					logger.Error("Error reading %s: %s", statusFile, err)
+					bwu.w.nc.Logger.Error("Error reading %s: %s", statusFile, err)
 				}
 			}
 		case <-time.After(time.Second):
@@ -350,7 +381,7 @@ loop:
 					fi = newFi
 					err = bwu.Load()
 					if err != nil {
-						logger.Error("Error reading %s: %s", statusFile, err)
+						bwu.w.nc.Logger.Error("Error reading %s: %s", statusFile, err)
 					}
 				}
 			}
@@ -396,12 +427,12 @@ func (bwu *BaseWorkUnit) Release(force bool) error {
 			attemptsLeft--
 
 			if attemptsLeft > 0 {
-				logger.Warning("Error removing directory for %s. Retrying %d more times.", bwu.unitID, attemptsLeft)
+				bwu.w.nc.Logger.Warning("Error removing directory for %s. Retrying %d more times.", bwu.unitID, attemptsLeft)
 				time.Sleep(time.Second)
 
 				continue
 			} else {
-				logger.Error("Error removing directory for %s. No more retries left.", bwu.unitID)
+				bwu.w.nc.Logger.Error("Error removing directory for %s. No more retries left.", bwu.unitID)
 
 				return err
 			}

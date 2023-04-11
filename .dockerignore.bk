@@ -1,0 +1,16 @@
+.idea
+receptor
+receptor.exe
+receptor.app
+recepcert
+net
+receptorctl-test-venv/
+.container-flag*
+.VERSION
+kubectl
+/receptorctl/AUTHORS
+/receptorctl/ChangeLog
+/receptor-python-worker/ChangeLog
+/receptor-python-worker/AUTHORS
+.vagrant/
+Dockerfile
