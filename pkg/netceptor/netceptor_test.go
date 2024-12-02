@@ -10,7 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ansible/receptor/tests/utils"
 	"github.com/prep/socketpair"
+	"github.com/quic-go/quic-go"
+	"github.com/quic-go/quic-go/logging"
 )
 
 type logWriter struct {
@@ -117,11 +120,11 @@ func TestHopCountLimit(t *testing.T) {
 	}
 
 	// Inject a fake node3 that both nodes think the other node has a route to
-	n1.addNameHash("node3")
+	n1.AddNameHash("node3")
 	n1.routingTableLock.Lock()
 	n1.routingTable["node3"] = "node2"
 	n1.routingTableLock.Unlock()
-	n2.addNameHash("node3")
+	n2.AddNameHash("node3")
 	n2.routingTableLock.Lock()
 	n2.routingTable["node3"] = "node1"
 	n2.routingTableLock.Unlock()
@@ -373,8 +376,13 @@ func TestDuplicateNodeDetection(t *testing.T) {
 	nodes := make([]*Netceptor, netsize)
 	backends := make([]*ExternalBackend, netsize)
 	routingChans := make([]chan map[string]string, netsize)
+	logWriter := utils.NewTestLogWriter()
+	defer func() {
+		t.Log(logWriter.String())
+	}()
 	for i := 0; i < netsize; i++ {
 		nodes[i] = New(context.Background(), fmt.Sprintf("node%d", i))
+		nodes[i].Logger.SetOutput(logWriter)
 		routingChans[i] = nodes[i].SubscribeRoutingUpdates()
 		var err error
 		backends[i], err = NewExternalBackend()
@@ -448,40 +456,38 @@ func TestDuplicateNodeDetection(t *testing.T) {
 	// Make sure the new node gets a more recent timestamp than the old one
 	time.Sleep(1 * time.Second)
 
-	for i := 0; i < 5; i++ {
-		// Create and connect a new node with a duplicate name
-		n := New(context.Background(), "node0")
-		n.Logger.Info("Duplicate node0 has epoch %d\n", n.epoch)
-		b, err := NewExternalBackend()
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = n.AddBackend(b)
-		if err != nil {
-			t.Fatal(err)
-		}
-		c1, c2, err := socketpair.New("unix")
-		if err != nil {
-			t.Fatal(err)
-		}
-		b.NewConnection(MessageConnFromNetConn(c1), true)
-		backends[netsize/2].NewConnection(MessageConnFromNetConn(c2), true)
-
-		// Wait for duplicate node to self-terminate
-		backendCloseChan := make(chan struct{})
-		go func() {
-			n.BackendWait()
-			close(backendCloseChan)
-		}()
-		select {
-		case <-backendCloseChan:
-		case <-time.After(120 * time.Second):
-			t.Fatal("timed out waiting for duplicate node to terminate")
-		}
-
-		// Force close the connection to the connected node
-		_ = c2.Close()
+	// Create and connect a new node with a duplicate name
+	n := New(context.Background(), "node0")
+	n.Logger.SetOutput(logWriter)
+	n.Logger.Info("Duplicate node0 has epoch %d\n", n.epoch)
+	b, err := NewExternalBackend()
+	if err != nil {
+		t.Fatal(err)
 	}
+	err = n.AddBackend(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c1, c2, err := socketpair.New("unix")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.NewConnection(MessageConnFromNetConn(c1), true)
+	backends[netsize/2].NewConnection(MessageConnFromNetConn(c2), true)
+	// Wait for duplicate node to self-terminate
+	backendCloseChan := make(chan struct{})
+	go func() {
+		n.BackendWait()
+		close(backendCloseChan)
+	}()
+	select {
+	case <-backendCloseChan:
+	case <-time.After(10 * time.Second):
+		t.Fatal("timed out waiting for duplicate node to terminate")
+	}
+
+	// Force close the connection to the connected node
+	_ = c2.Close()
 
 	// Shut down the rest of the network
 	for i := 0; i < netsize; i++ {
@@ -489,6 +495,10 @@ func TestDuplicateNodeDetection(t *testing.T) {
 	}
 	for i := 0; i < netsize; i++ {
 		nodes[i].BackendWait()
+	}
+
+	if !strings.Contains(logWriter.String(), "We are a duplicate node") {
+		t.Fatalf("Did not find expected log message from duplicate node.")
 	}
 }
 
@@ -859,5 +869,28 @@ func TestTooShortSetMaxConnectionIdleTime(t *testing.T) {
 	err := node.SetMaxConnectionIdleTime("60us")
 	if err == nil {
 		t.Fatal("this should have failed out, as we're passing in an invalid time object that violates the logic in SetMaxConnectionIdleTime")
+	}
+}
+
+func TestTracerReturnsNewConnectionTracer(t *testing.T) {
+	t.Parallel()
+	s := New(context.Background(), "node1")
+	p := logging.PerspectiveClient
+	os.Setenv("QLOGDIR", "/tmp/")
+	trace := s.tracer(s.context, p, quic.ConnectionID{})
+	if trace == nil {
+		t.Fatalf("tracer should return a newConnectionTracer when QLOGDIR environment variable is defined but got %v", trace)
+	}
+	os.Unsetenv("QLOGDIR")
+}
+
+func TestTracerDoesNotReturnsNewConnectionTracer(t *testing.T) {
+	t.Parallel()
+	s := New(context.Background(), "node1")
+	p := logging.PerspectiveClient
+	os.Unsetenv("QLOGDIR")
+	trace := s.tracer(s.context, p, quic.ConnectionID{})
+	if trace != nil {
+		t.Fatalf("tracer should return nil when QLOGDIR environment variable is not defined but got %v", trace)
 	}
 }

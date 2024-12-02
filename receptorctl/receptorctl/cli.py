@@ -9,7 +9,7 @@ import click
 import json
 from functools import partial
 import dateutil.parser
-import pkg_resources
+import importlib.metadata
 from .socket_interface import ReceptorControl
 
 
@@ -51,7 +51,7 @@ def print_error(message, nl=True):
     envvar="RECEPTORCTL_SOCKET",
     required=True,
     show_envvar=True,
-    help="Control socket address to connect to Receptor (defaults to Unix socket, use tcp:// for TCP socket)",  # noqa: E501
+    help="Control socket address to for the Receptor connection (The default is 'unix:' for a Unix socket, use 'tcp://' for a TCP socket)",  # noqa: E501
 )
 @click.option(
     "--config",
@@ -87,7 +87,7 @@ def print_error(message, nl=True):
 def cli(ctx, socket, config, tlsclient, rootcas, key, cert, insecureskipverify):
     ctx.obj = {
         "rc": None,
-        "receptorctlVersion": pkg_resources.get_distribution("receptorctl").version,
+        "receptorctlVersion": importlib.metadata.version("receptorctl"),
         "receptorVersion": "Unknown",
     }
     # If we got a socket parameter we can make a ReceptorControl object

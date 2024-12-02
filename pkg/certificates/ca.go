@@ -11,6 +11,8 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"io"
+	"io/fs"
 	"math/big"
 	"net"
 	"os"
@@ -19,6 +21,38 @@ import (
 
 	"github.com/ansible/receptor/pkg/utils"
 )
+
+// Oser is the function calls interfaces for mocking os.
+type Oser interface {
+	ReadFile(name string) ([]byte, error)
+	WriteFile(name string, data []byte, perm fs.FileMode) error
+}
+
+// OsWrapper is the Wrapper structure for Oser.
+type OsWrapper struct{}
+
+// ReadFile for Oser defaults to os library call.
+func (ow *OsWrapper) ReadFile(name string) ([]byte, error) {
+	return os.ReadFile(name)
+}
+
+// WriteFile for Oser defaults to os library call.
+func (ow *OsWrapper) WriteFile(name string, data []byte, perm fs.FileMode) error {
+	return os.WriteFile(name, data, perm)
+}
+
+// Rsaer is the function calls interface for mocking rsa.
+type Rsaer interface {
+	GenerateKey(random io.Reader, bits int) (*rsa.PrivateKey, error)
+}
+
+// RsaWrapper is the Wrapper structure for Rsaer.
+type RsaWrapper struct{}
+
+// GenerateKey for RsaWrapper defaults to rsa library call.
+func (rw *RsaWrapper) GenerateKey(random io.Reader, bits int) (*rsa.PrivateKey, error) {
+	return rsa.GenerateKey(random, bits)
+}
 
 // CertNames lists the subjectAltNames that can be assigned to a certificate or request.
 type CertNames struct {
@@ -37,8 +71,8 @@ type CertOptions struct {
 }
 
 // LoadFromPEMFile loads certificate data from a PEM file.
-func LoadFromPEMFile(filename string) ([]interface{}, error) {
-	content, err := os.ReadFile(filename)
+func LoadFromPEMFile(filename string, osWrapper Oser) ([]interface{}, error) {
+	content, err := Oser.ReadFile(osWrapper, filename)
 	if err != nil {
 		return nil, err
 	}
@@ -71,6 +105,12 @@ func LoadFromPEMFile(filename string) ([]interface{}, error) {
 				return nil, err
 			}
 			results = append(results, key)
+		case "PRIVATE KEY":
+			key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+			if err != nil {
+				return nil, err
+			}
+			results = append(results, key)
 		case "PUBLIC KEY":
 			key, err := x509.ParsePKIXPublicKey(block.Bytes)
 			if err != nil {
@@ -86,7 +126,7 @@ func LoadFromPEMFile(filename string) ([]interface{}, error) {
 }
 
 // SaveToPEMFile saves certificate data to a PEM file.
-func SaveToPEMFile(filename string, data []interface{}) error {
+func SaveToPEMFile(filename string, data []interface{}, osWrapper Oser) error {
 	var err error
 	var ok bool
 	content := make([]string, 0)
@@ -155,14 +195,16 @@ func SaveToPEMFile(filename string, data []interface{}) error {
 
 			continue
 		}
+
+		return fmt.Errorf("unknown block type %s", elem)
 	}
 
-	return os.WriteFile(filename, []byte(strings.Join(content, "\n")), 0o600)
+	return Oser.WriteFile(osWrapper, filename, []byte(strings.Join(content, "\n")), 0o600)
 }
 
 // LoadCertificate loads a single certificate from a file.
-func LoadCertificate(filename string) (*x509.Certificate, error) {
-	data, err := LoadFromPEMFile(filename)
+func LoadCertificate(filename string, osWrapper Oser) (*x509.Certificate, error) {
+	data, err := LoadFromPEMFile(filename, osWrapper)
 	if err != nil {
 		return nil, err
 	}
@@ -178,8 +220,8 @@ func LoadCertificate(filename string) (*x509.Certificate, error) {
 }
 
 // LoadRequest loads a single certificate request from a file.
-func LoadRequest(filename string) (*x509.CertificateRequest, error) {
-	data, err := LoadFromPEMFile(filename)
+func LoadRequest(filename string, osWrapper Oser) (*x509.CertificateRequest, error) {
+	data, err := LoadFromPEMFile(filename, osWrapper)
 	if err != nil {
 		return nil, err
 	}
@@ -195,8 +237,8 @@ func LoadRequest(filename string) (*x509.CertificateRequest, error) {
 }
 
 // LoadPrivateKey loads a single RSA private key from a file.
-func LoadPrivateKey(filename string) (*rsa.PrivateKey, error) {
-	data, err := LoadFromPEMFile(filename)
+func LoadPrivateKey(filename string, osWrapper Oser) (*rsa.PrivateKey, error) {
+	data, err := LoadFromPEMFile(filename, osWrapper)
 	if err != nil {
 		return nil, err
 	}
@@ -212,8 +254,8 @@ func LoadPrivateKey(filename string) (*rsa.PrivateKey, error) {
 }
 
 // LoadPublicKey loads a single RSA public key from a file.
-func LoadPublicKey(filename string) (*rsa.PublicKey, error) {
-	data, err := LoadFromPEMFile(filename)
+func LoadPublicKey(filename string, osWrapper Oser) (*rsa.PublicKey, error) {
+	data, err := LoadFromPEMFile(filename, osWrapper)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +277,7 @@ type CA struct {
 }
 
 // CreateCA initializes a new CertKeyPair from given parameters.
-func CreateCA(opts *CertOptions) (*CA, error) {
+func CreateCA(opts *CertOptions, rsaWrapper Rsaer) (*CA, error) {
 	if opts.CommonName == "" {
 		return nil, fmt.Errorf("must provide CommonName")
 	}
@@ -254,7 +296,7 @@ func CreateCA(opts *CertOptions) (*CA, error) {
 
 	var err error
 	ca := &CA{}
-	ca.PrivateKey, err = rsa.GenerateKey(rand.Reader, opts.Bits)
+	ca.PrivateKey, err = rsaWrapper.GenerateKey(rand.Reader, opts.Bits)
 	if err != nil {
 		return nil, err
 	}

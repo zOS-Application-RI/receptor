@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/ghjm/cmdline"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -46,6 +47,7 @@ func GetLogLevelByName(logName string) (int, error) {
 	return 0, err
 }
 
+// This doesn't seem to be used anywhere.
 // GetLogLevel returns current log level.
 func GetLogLevel() int {
 	return logLevel
@@ -144,6 +146,33 @@ func (rl *ReceptorLogger) SanitizedInfo(format string, v ...interface{}) {
 // Debug contains extra information helpful to developers.
 func (rl *ReceptorLogger) Debug(format string, v ...interface{}) {
 	rl.Log(DebugLevel, format, v...)
+}
+
+// Debug payload data.
+func (rl *ReceptorLogger) DebugPayload(payloadDebug int, payload string, workUnitID string, connectionType string) {
+	var payloadMessage string
+	var workunitIDMessage string
+	var connectionTypeMessage string
+	switch payloadDebug {
+	case 3:
+		payloadMessage = fmt.Sprintf(" with a payload of: %s", payload)
+
+		fallthrough
+	case 2:
+		if workUnitID != "" {
+			workunitIDMessage = fmt.Sprintf(" with work unit %s", workUnitID)
+		} else {
+			workunitIDMessage = ", work unit not created yet"
+		}
+
+		fallthrough
+	case 1:
+		if connectionType != "" {
+			connectionTypeMessage = fmt.Sprintf("Reading from %s", connectionType)
+		}
+	default:
+	}
+	rl.Debug(fmt.Sprintf("PACKET TRACING ENABLED: %s%s%s", connectionTypeMessage, workunitIDMessage, payloadMessage)) //nolint:govet
 }
 
 // SanitizedDebug contains extra information helpful to developers.
@@ -261,11 +290,11 @@ func (rl *ReceptorLogger) LogLevelToName(logLevel int) (string, error) {
 	return "", err
 }
 
-type loglevelCfg struct {
+type LoglevelCfg struct {
 	Level string `description:"Log level: Error, Warning, Info or Debug" barevalue:"yes" default:"error"`
 }
 
-func (cfg loglevelCfg) Init() error {
+func (cfg LoglevelCfg) Init() error {
 	var err error
 	val, err := GetLogLevelByName(cfg.Level)
 	if err != nil {
@@ -276,20 +305,24 @@ func (cfg loglevelCfg) Init() error {
 	return nil
 }
 
-type traceCfg struct{}
+type TraceCfg struct{}
 
-func (cfg traceCfg) Prepare() error {
+func (cfg TraceCfg) Prepare() error {
 	return nil
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	logLevel = InfoLevel
 	showTrace = false
 	log.SetOutput(os.Stdout)
 	log.SetFlags(log.Ldate | log.Ltime)
 
 	cmdline.RegisterConfigTypeForApp("receptor-logging",
-		"log-level", "Set specific log level output", loglevelCfg{}, cmdline.Singleton)
+		"log-level", "Specifies the verbosity level for command output", LoglevelCfg{}, cmdline.Singleton)
 	cmdline.RegisterConfigTypeForApp("receptor-logging",
-		"trace", "Enables packet tracing output", traceCfg{}, cmdline.Singleton)
+		"trace", "Enables packet tracing output", TraceCfg{}, cmdline.Singleton)
 }

@@ -1,6 +1,3 @@
-//go:build !no_tcp_backend && !no_backends
-// +build !no_tcp_backend,!no_backends
-
 package backends
 
 import (
@@ -17,6 +14,7 @@ import (
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
+	"github.com/spf13/viper"
 )
 
 // TCPDialer implements Backend for outbound TCP.
@@ -90,14 +88,6 @@ func NewTCPListener(address string, tls *tls.Config, logger *logger.ReceptorLogg
 }
 
 // Addr returns the network address the listener is listening on.
-func (b *TCPListener) Addr() net.Addr {
-	if b.li == nil {
-		return nil
-	}
-
-	return b.li.Addr()
-}
-
 func (b *TCPListener) GetAddr() string {
 	return b.li.Addr().String()
 }
@@ -247,7 +237,7 @@ func (ns *TCPSession) Close() error {
 // Command line
 // **************************************************************************
 
-//TODO make these fields private
+// TODO make these fields private
 // TCPListenerCfg is the cmdline configuration object for a TCP listener.
 type TCPListenerCfg struct {
 	BindAddr     string             `description:"Local address to bind to" default:"0.0.0.0"`
@@ -312,7 +302,7 @@ func (cfg TCPListenerCfg) Run() error {
 	return nil
 }
 
-//TODO make these fields private
+// TODO make these fields private
 // TCPDialerCfg is the cmdline configuration object for a TCP dialer.
 type TCPDialerCfg struct {
 	Address      string   `description:"Remote address (Host:Port) to connect to" barevalue:"yes" required:"yes"`
@@ -375,6 +365,10 @@ func (cfg TCPListenerCfg) Reload() error {
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	cmdline.RegisterConfigTypeForApp("receptor-backends",
 		"tcp-listener", "Run a backend listener on a TCP port", TCPListenerCfg{}, cmdline.Section(backendSection))
 	cmdline.RegisterConfigTypeForApp("receptor-backends",

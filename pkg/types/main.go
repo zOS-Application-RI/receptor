@@ -1,0 +1,89 @@
+package types
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"regexp"
+	"strings"
+
+	"github.com/ansible/receptor/pkg/controlsvc"
+	"github.com/ansible/receptor/pkg/netceptor"
+	"github.com/ansible/receptor/pkg/workceptor"
+)
+
+type NodeCfg struct {
+	ID                               string                       `description:"Node ID. Defaults to the local hostname." barevalue:"yes"`
+	DataDir                          string                       `description:"Directory in which to store node data." default:"/tmp/receptor"`
+	FirewallRules                    []netceptor.FirewallRuleData `description:"Firewall rules, see documentation for syntax."`
+	MaxIdleConnectionTimeout         string                       `description:"Maximum duration with no traffic before a backend connection is timed out and refreshed."`
+	ReceptorKubeSupportReconnect     string
+	ReceptorKubeClientsetQPS         string
+	ReceptorKubeClientsetBurst       string
+	ReceptorKubeClientsetRateLimiter string
+}
+
+func (cfg NodeCfg) Init() error {
+	var err error
+	if cfg.ID == "" {
+		host, err := os.Hostname()
+		if err != nil {
+			return err
+		}
+		lchost := strings.ToLower(host)
+		if lchost == "localhost" || strings.HasPrefix(lchost, "localhost.") {
+			return fmt.Errorf("no node ID specified and local host name is localhost")
+		}
+		cfg.ID = host
+	} else {
+		submitIDRegex := regexp.MustCompile(`^[.\-_@a-zA-Z0-9]*$`)
+		match := submitIDRegex.FindSubmatch([]byte(cfg.ID))
+		if match == nil {
+			return fmt.Errorf("node id can only contain a-z, A-Z, 0-9 or special characters . - _ @ but received: %s", cfg.ID)
+		}
+	}
+	if strings.ToLower(cfg.ID) == "localhost" {
+		return fmt.Errorf("node ID \"localhost\" is reserved")
+	}
+
+	netceptor.MainInstance = netceptor.New(context.Background(), cfg.ID)
+
+	if len(cfg.FirewallRules) > 0 {
+		rules, err := netceptor.ParseFirewallRules(cfg.FirewallRules)
+		if err != nil {
+			return err
+		}
+		err = netceptor.MainInstance.AddFirewallRules(rules, true)
+		if err != nil {
+			return err
+		}
+	}
+
+	// update netceptor.MainInstance with the MaxIdleConnectionTimeout from the nodeCfg struct
+	// this is a fall-forward mechanism. If the user didn't provide a value for MaxIdleConnectionTimeout in their configuration file,
+	// we will apply the default timeout of 30s to netceptor.maxConnectionIdleTime
+	if cfg.MaxIdleConnectionTimeout != "" {
+		err = netceptor.MainInstance.SetMaxConnectionIdleTime(cfg.MaxIdleConnectionTimeout)
+		if err != nil {
+			return err
+		}
+	}
+
+	workceptor.MainInstance, err = workceptor.New(context.Background(), netceptor.MainInstance, cfg.DataDir)
+	if err != nil {
+		return err
+	}
+	controlsvc.MainInstance = controlsvc.New(true, netceptor.MainInstance)
+	err = workceptor.MainInstance.RegisterWithControlService(controlsvc.MainInstance)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (cfg NodeCfg) Run() error {
+	workceptor.MainInstance.ListKnownUnitIDs() // Triggers a scan of unit dirs and restarts any that need it
+
+	return nil
+}

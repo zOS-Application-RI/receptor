@@ -1,6 +1,3 @@
-//go:build !no_tls_config
-// +build !no_tls_config
-
 package netceptor
 
 import (
@@ -14,6 +11,7 @@ import (
 
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/ghjm/cmdline"
+	"github.com/spf13/viper"
 )
 
 // **************************************************************************
@@ -59,7 +57,7 @@ func checkCertificatesMatchNodeID(certbytes []byte, n *Netceptor, certName strin
 	}
 
 	if !found {
-		return fmt.Errorf("MainInstance.nodeID=%s not found in certificate name(s); names found=%s; cfg section=%s; server cert=%s", MainInstance.nodeID, fmt.Sprint(receptorNames), certName, certPath)
+		return fmt.Errorf("nodeID=%s not found in certificate name(s); names found=%s; cfg section=%s; server cert=%s", n.nodeID, fmt.Sprint(receptorNames), certName, certPath)
 	}
 
 	return nil
@@ -160,7 +158,6 @@ func (cfg TLSServerConfig) PrepareTLSServerConfig(n *Netceptor) (*tls.Config, er
 // Prepare creates the tls.config and stores it in the global map.
 func (cfg TLSServerConfig) Prepare() error {
 	tlscfg, err := cfg.PrepareTLSServerConfig(MainInstance)
-
 	if err != nil {
 		return fmt.Errorf("error preparing tls server config: %s", err)
 	}
@@ -171,8 +168,8 @@ func (cfg TLSServerConfig) Prepare() error {
 // TLSClientConfig stores the configuration options for a TLS client.
 type TLSClientConfig struct {
 	Name                   string   `required:"true" description:"Name of this TLS client configuration"`
-	Cert                   string   `required:"false" description:"Client certificate filename"`
-	Key                    string   `required:"false" description:"Client private key filename"`
+	Cert                   string   `required:"true" description:"Client certificate filename"`
+	Key                    string   `required:"true" description:"Client private key filename"`
 	RootCAs                string   `required:"false" description:"Root CA bundle to use instead of system trust"`
 	InsecureSkipVerify     bool     `required:"false" description:"Accept any server cert" default:"false"`
 	PinnedServerCert       []string `required:"false" description:"Pinned fingerprint of required server certificate"`
@@ -201,7 +198,7 @@ func (cfg TLSClientConfig) PrepareTLSClientConfig(n *Netceptor) (tlscfg *tls.Con
 
 		// check client crt to ensure that the receptor NodeID is in the client certificate as an OID
 		if !cfg.SkipReceptorNamesCheck {
-			if err := checkCertificatesMatchNodeID(certBytes, MainInstance, cfg.Name, cfg.Cert); err != nil {
+			if err := checkCertificatesMatchNodeID(certBytes, n, cfg.Name, cfg.Cert); err != nil {
 				return nil, nil, err
 			}
 		}
@@ -232,7 +229,6 @@ func (cfg TLSClientConfig) PrepareTLSClientConfig(n *Netceptor) (tlscfg *tls.Con
 // Prepare creates the tls.config and stores it in the global map.
 func (cfg TLSClientConfig) Prepare() error {
 	tlscfg, pinnedFingerprints, err := cfg.PrepareTLSClientConfig(MainInstance)
-
 	if err != nil {
 		return fmt.Errorf("error preparing tls client config: %s", err)
 	}
@@ -241,6 +237,10 @@ func (cfg TLSClientConfig) Prepare() error {
 }
 
 func init() {
+	version := viper.GetInt("version")
+	if version > 1 {
+		return
+	}
 	cmdline.RegisterConfigTypeForApp("receptor-tls",
 		"tls-server", "Define a TLS server configuration", TLSServerConfig{}, cmdline.Section(configSection))
 	cmdline.RegisterConfigTypeForApp("receptor-tls",

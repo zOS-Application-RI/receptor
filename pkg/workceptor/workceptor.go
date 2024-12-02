@@ -5,8 +5,11 @@ package workceptor
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
+	"io/fs"
+	"net"
 	"os"
 	"path"
 	"reflect"
@@ -16,24 +19,47 @@ import (
 
 	"github.com/ansible/receptor/pkg/certificates"
 	"github.com/ansible/receptor/pkg/controlsvc"
+	"github.com/ansible/receptor/pkg/logger"
 	"github.com/ansible/receptor/pkg/netceptor"
 	"github.com/ansible/receptor/pkg/randstr"
 	"github.com/ansible/receptor/pkg/utils"
 	"github.com/golang-jwt/jwt/v4"
 )
 
+// NetceptorForWorkceptor is a interface to decouple workceptor from netceptor.
+// it includes only the functions that workceptor uses.
+type NetceptorForWorkceptor interface {
+	NodeID() string
+	AddWorkCommand(typeName string, verifySignature bool) error
+	GetClientTLSConfig(name string, expectedHostName string, expectedHostNameType netceptor.ExpectedHostnameType) (*tls.Config, error) // have a common pkg for types
+	GetLogger() *logger.ReceptorLogger
+	DialContext(ctx context.Context, node string, service string, tlscfg *tls.Config) (*netceptor.Conn, error) // create an interface for Conn
+}
+
+type ServerForWorkceptor interface {
+	AddControlFunc(name string, cType controlsvc.ControlCommandType) error
+	ConnectionListener(ctx context.Context, listener net.Listener)
+	RunControlSession(conn net.Conn)
+	RunControlSvc(ctx context.Context, service string, tlscfg *tls.Config, unixSocket string, unixSocketPermissions fs.FileMode, tcpListen string, tcptls *tls.Config) error
+	SetServerNet(n controlsvc.Neter)
+	SetServerTLS(t controlsvc.Tlser)
+	SetServerUtils(u controlsvc.Utiler)
+	SetupConnection(conn net.Conn)
+}
+
 // Workceptor is the main object that handles unit-of-work management.
 type Workceptor struct {
 	ctx               context.Context
-	nc                *netceptor.Netceptor
+	Cancel            context.CancelFunc
+	nc                NetceptorForWorkceptor
 	dataDir           string
 	workTypesLock     *sync.RWMutex
 	workTypes         map[string]*workType
 	activeUnitsLock   *sync.RWMutex
 	activeUnits       map[string]WorkUnit
-	signingKey        string
-	signingExpiration time.Duration
-	verifyingKey      string
+	SigningKey        string
+	SigningExpiration time.Duration
+	VerifyingKey      string
 }
 
 // workType is the record for a registered type of work.
@@ -43,22 +69,24 @@ type workType struct {
 }
 
 // New constructs a new Workceptor instance.
-func New(ctx context.Context, nc *netceptor.Netceptor, dataDir string) (*Workceptor, error) {
+func New(ctx context.Context, nc NetceptorForWorkceptor, dataDir string) (*Workceptor, error) {
 	if dataDir == "" {
 		dataDir = path.Join(os.TempDir(), "receptor")
 	}
 	dataDir = path.Join(dataDir, nc.NodeID())
+	c, cancel := context.WithCancel(ctx)
 	w := &Workceptor{
-		ctx:               ctx,
+		ctx:               c,
+		Cancel:            cancel,
 		nc:                nc,
 		dataDir:           dataDir,
 		workTypesLock:     &sync.RWMutex{},
 		workTypes:         make(map[string]*workType),
 		activeUnitsLock:   &sync.RWMutex{},
 		activeUnits:       make(map[string]WorkUnit),
-		signingKey:        "",
-		signingExpiration: 5 * time.Minute,
-		verifyingKey:      "",
+		SigningKey:        "",
+		SigningExpiration: 5 * time.Minute,
+		VerifyingKey:      "",
 	}
 	err := w.RegisterWorker("remote", newRemoteWorker, false)
 	if err != nil {
@@ -82,7 +110,7 @@ func stdoutSize(unitdir string) int64 {
 }
 
 // RegisterWithControlService registers this workceptor instance with a control service instance.
-func (w *Workceptor) RegisterWithControlService(cs *controlsvc.Server) error {
+func (w *Workceptor) RegisterWithControlService(cs ServerForWorkceptor) error {
 	err := cs.AddControlFunc("work", &workceptorCommandType{
 		w: w,
 	})
@@ -125,14 +153,25 @@ func (w *Workceptor) RegisterWorker(typeName string, newWorkerFunc NewWorkerFunc
 	return nil
 }
 
-func (w *Workceptor) generateUnitID(lock bool) (string, error) {
+func (w *Workceptor) generateUnitID(lock bool, workUnitID string) (string, error) {
 	if lock {
 		w.activeUnitsLock.RLock()
 		defer w.activeUnitsLock.RUnlock()
 	}
 	var ident string
 	for {
-		ident = randstr.RandomString(8)
+		if workUnitID == "" {
+			rstr := randstr.RandomString(8)
+			nid := w.nc.NodeID()
+			ident = fmt.Sprintf("%s%s", nid, rstr)
+		} else {
+			ident = workUnitID
+			unitdir := path.Join(w.dataDir, ident)
+			_, err := os.Stat(unitdir)
+			if err == nil {
+				return "", fmt.Errorf("workunit ID %s is already in use, cannot use the same workunit ID more than once", ident)
+			}
+		}
 		_, ok := w.activeUnits[ident]
 		if !ok {
 			unitdir := path.Join(w.dataDir, ident)
@@ -147,16 +186,16 @@ func (w *Workceptor) generateUnitID(lock bool) (string, error) {
 }
 
 func (w *Workceptor) createSignature(nodeID string) (string, error) {
-	if w.signingKey == "" {
+	if w.SigningKey == "" {
 		return "", fmt.Errorf("cannot sign work: signing key is empty")
 	}
-	exp := time.Now().Add(w.signingExpiration)
+	exp := time.Now().Add(w.SigningExpiration)
 
 	claims := &jwt.RegisteredClaims{
 		ExpiresAt: jwt.NewNumericDate(exp),
 		Audience:  []string{nodeID},
 	}
-	rsaPrivateKey, err := certificates.LoadPrivateKey(w.signingKey)
+	rsaPrivateKey, err := certificates.LoadPrivateKey(w.SigningKey, &certificates.OsWrapper{})
 	if err != nil {
 		return "", fmt.Errorf("could not load signing key file: %s", err.Error())
 	}
@@ -189,10 +228,10 @@ func (w *Workceptor) VerifySignature(signature string) error {
 	if signature == "" {
 		return fmt.Errorf("could not verify signature: signature is empty")
 	}
-	if w.verifyingKey == "" {
+	if w.VerifyingKey == "" {
 		return fmt.Errorf("could not verify signature: verifying key not specified")
 	}
-	rsaPublicKey, err := certificates.LoadPublicKey(w.verifyingKey)
+	rsaPublicKey, err := certificates.LoadPublicKey(w.VerifyingKey, &certificates.OsWrapper{})
 	if err != nil {
 		return fmt.Errorf("could not load verifying key file: %s", err.Error())
 	}
@@ -215,7 +254,7 @@ func (w *Workceptor) VerifySignature(signature string) error {
 }
 
 // AllocateUnit creates a new local work unit and generates an identifier for it.
-func (w *Workceptor) AllocateUnit(workTypeName string, params map[string]string) (WorkUnit, error) {
+func (w *Workceptor) AllocateUnit(workTypeName string, workUnitID string, params map[string]string) (WorkUnit, error) {
 	w.workTypesLock.RLock()
 	wt, ok := w.workTypes[workTypeName]
 	w.workTypesLock.RUnlock()
@@ -224,11 +263,11 @@ func (w *Workceptor) AllocateUnit(workTypeName string, params map[string]string)
 	}
 	w.activeUnitsLock.Lock()
 	defer w.activeUnitsLock.Unlock()
-	ident, err := w.generateUnitID(false)
+	ident, err := w.generateUnitID(false, workUnitID)
 	if err != nil {
 		return nil, err
 	}
-	worker := wt.newWorkerFunc(w, ident, workTypeName)
+	worker := wt.newWorkerFunc(nil, w, ident, workTypeName)
 	err = worker.SetFromParams(params)
 	if err == nil {
 		err = worker.Save()
@@ -242,7 +281,7 @@ func (w *Workceptor) AllocateUnit(workTypeName string, params map[string]string)
 }
 
 // AllocateRemoteUnit creates a new remote work unit and generates a local identifier for it.
-func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsClient, ttl string, signWork bool, params map[string]string) (WorkUnit, error) {
+func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, workUnitID string, tlsClient, ttl string, signWork bool, params map[string]string) (WorkUnit, error) {
 	if tlsClient != "" {
 		_, err := w.nc.GetClientTLSConfig(tlsClient, "testhost", netceptor.ExpectedHostnameTypeReceptor)
 		if err != nil {
@@ -260,7 +299,7 @@ func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsClient, t
 	if hasSecrets && tlsClient == "" {
 		return nil, fmt.Errorf("cannot send secrets over a non-TLS connection")
 	}
-	rw, err := w.AllocateUnit("remote", params)
+	rw, err := w.AllocateUnit("remote", workUnitID, params)
 	if err != nil {
 		return nil, err
 	}
@@ -268,19 +307,19 @@ func (w *Workceptor) AllocateRemoteUnit(remoteNode, remoteWorkType, tlsClient, t
 	if ttl != "" {
 		duration, err := time.ParseDuration(ttl)
 		if err != nil {
-			w.nc.Logger.Error("Failed to parse provided ttl -- valid examples include '1.5h', '30m', '30m10s'")
+			w.nc.GetLogger().Error("Failed to parse provided ttl -- valid examples include '1.5h', '30m', '30m10s'")
 
 			return nil, err
 		}
-		if signWork && duration > w.signingExpiration {
-			w.nc.Logger.Warning("json web token expires before ttl")
+		if signWork && duration > w.SigningExpiration {
+			w.nc.GetLogger().Warning("json web token expires before ttl")
 		}
 		expiration = time.Now().Add(duration)
 	} else {
 		expiration = time.Time{}
 	}
 	rw.UpdateFullStatus(func(status *StatusFileData) {
-		ed := status.ExtraData.(*remoteExtraData)
+		ed := status.ExtraData.(*RemoteExtraData)
 		ed.RemoteNode = remoteNode
 		ed.RemoteWorkType = remoteWorkType
 		ed.TLSClient = tlsClient
@@ -298,7 +337,7 @@ func (w *Workceptor) scanForUnit(unitID string) {
 	unitdir := path.Join(w.dataDir, unitID)
 	fi, _ := os.Stat(unitdir)
 	if fi == nil || !fi.IsDir() {
-		w.nc.Logger.Error("Error locating unit: %s", unitID)
+		w.nc.GetLogger().Error("Error locating unit: %s", unitID)
 
 		return
 	}
@@ -309,29 +348,32 @@ func (w *Workceptor) scanForUnit(unitID string) {
 	if !ok {
 		statusFilename := path.Join(unitdir, "status")
 		sfd := &StatusFileData{}
-		_ = sfd.Load(statusFilename)
+		serr := sfd.Load(statusFilename)
+		if serr != nil {
+			w.nc.GetLogger().Error("Error loading %s: %s", statusFilename, serr)
+		}
 		w.workTypesLock.RLock()
 		wt, ok := w.workTypes[sfd.WorkType]
 		w.workTypesLock.RUnlock()
 		var worker WorkUnit
 		if ok {
-			worker = wt.newWorkerFunc(w, ident, sfd.WorkType)
+			worker = wt.newWorkerFunc(nil, w, ident, sfd.WorkType)
 		} else {
 			worker = newUnknownWorker(w, ident, sfd.WorkType)
 		}
 		if _, err := os.Stat(statusFilename); os.IsNotExist(err) {
-			w.nc.Logger.Error("Status file has disappeared for %s.", ident)
+			w.nc.GetLogger().Error("Status file has disappeared for %s.", ident)
 
 			return
 		}
 		err := worker.Load()
 		if err != nil {
-			w.nc.Logger.Warning("Failed to restart worker %s due to read error: %s", unitdir, err)
+			w.nc.GetLogger().Warning("Failed to restart worker %s due to read error: %s", unitdir, err)
 			worker.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Failed to restart: %s", err), stdoutSize(unitdir))
 		}
 		err = worker.Restart()
 		if err != nil && !IsPending(err) {
-			w.nc.Logger.Warning("Failed to restart worker %s: %s", unitdir, err)
+			w.nc.GetLogger().Warning("Failed to restart worker %s: %s", unitdir, err)
 			worker.UpdateBasicStatus(WorkStateFailed, fmt.Sprintf("Failed to restart: %s", err), stdoutSize(unitdir))
 		}
 		w.activeUnitsLock.Lock()
@@ -468,7 +510,7 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 		defer func() {
 			err = stdout.Close()
 			if err != nil {
-				w.nc.Logger.Error("Error closing stdout %s", stdoutFilename)
+				w.nc.GetLogger().Error("Error closing stdout %s", stdoutFilename)
 			}
 			resultClose()
 			cancel()
@@ -481,7 +523,7 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 			case err == nil:
 			case os.IsNotExist(err):
 				if IsComplete(unit.Status().State) {
-					w.nc.Logger.Warning("Unit completed without producing any stdout\n")
+					w.nc.GetLogger().Warning("Unit completed without producing any stdout\n")
 
 					return
 				}
@@ -491,7 +533,7 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 
 				continue
 			default:
-				w.nc.Logger.Error("Error accessing stdout file: %s\n", err)
+				w.nc.GetLogger().Error("Error accessing stdout file: %s\n", err)
 
 				return
 			}
@@ -511,7 +553,7 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 					if os.IsNotExist(err) {
 						failures++
 						if failures > 3 {
-							w.nc.Logger.Error("Exceeded retries for reading stdout %s", stdoutFilename)
+							w.nc.GetLogger().Error("Exceeded retries for reading stdout %s", stdoutFilename)
 							statChan <- struct{}{}
 
 							return
@@ -536,12 +578,12 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 					var newPos int64
 					newPos, err = stdout.Seek(filePos, 0)
 					if err != nil {
-						w.nc.Logger.Warning("Seek error processing stdout: %s\n", err)
+						w.nc.GetLogger().Warning("Seek error processing stdout: %s\n", err)
 
 						return
 					}
 					if newPos != filePos {
-						w.nc.Logger.Warning("Seek error processing stdout\n")
+						w.nc.GetLogger().Warning("Seek error processing stdout\n")
 
 						return
 					}
@@ -564,12 +606,12 @@ func (w *Workceptor) GetResults(ctx context.Context, unitID string, startPos int
 			if err == io.EOF {
 				unitStatus := unit.Status()
 				if IsComplete(unitStatus.State) && filePos >= unitStatus.StdoutSize {
-					w.nc.Logger.Debug("Stdout complete - closing channel for: %s \n", unitID)
+					w.nc.GetLogger().Debug("Stdout complete - closing channel for: %s \n", unitID)
 
 					return
 				}
 			} else if err != nil {
-				w.nc.Logger.Error("Error reading stdout: %s\n", err)
+				w.nc.GetLogger().Error("Error reading stdout: %s\n", err)
 
 				return
 			}
